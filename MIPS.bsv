@@ -4,10 +4,11 @@ import AvalonCommon::*;
 import AvalonMaster::*;
 import AvalonMasterEmu::*;
 
-module mkMIPSEmu();
-    AvalonMaster#(21,32) masterAdapter <- mkAvalonMasterEmu;
-    Reg#(Bit#(21)) addrReq <- mkReg(0);
-    Reg#(Bit#(21)) addrResp <- mkReg(0);
+module mkMIPSCPU#(module#(AvalonMaster#(26,32)) mkMaster) (AvalonMasterWires#(26,32));
+    AvalonMaster#(26,32) masterAdapter <- mkMaster;
+    Reg#(Bit#(26)) addrReq <- mkReg(0);
+    Reg#(Bit#(26)) addrResp <- mkReg(0);
+
     rule requestAddr;
         masterAdapter.busServer.request.put(AvalonRequest{command: Read, addr: addrReq, data: ?});
         addrReq <= addrReq + 4;
@@ -18,4 +19,18 @@ module mkMIPSEmu();
         $display("%h %h", addrResp, data);
         addrResp <= addrResp + 4;
     endrule
+
+    return masterAdapter.masterWires;
 endmodule
+
+(* synthesize *)
+module mkMIPS(AvalonMasterWires#(26,32));
+    let mips <- mkMIPSCPU(mkAvalonMaster);
+    return mips;
+endmodule
+
+(* synthesize *)
+module mkMIPSEmu();
+    let mips <- mkMIPSCPU(mkAvalonMasterEmu);
+endmodule
+
