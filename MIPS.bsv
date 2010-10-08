@@ -4,10 +4,10 @@ import AvalonCommon::*;
 import AvalonMaster::*;
 import AvalonMasterEmu::*;
 
-module mkMIPSCPU#(module#(AvalonMaster#(26,32)) mkMaster) (AvalonMasterWires#(26,32));
-    AvalonMaster#(26,32) masterAdapter <- mkMaster;
-    Reg#(Bit#(26)) addrReq <- mkReg(0);
-    Reg#(Bit#(26)) addrResp <- mkReg(0);
+module mkMIPSCPU#(module#(AvalonMaster#(address_width,32)) mkMaster) (AvalonMasterWires#(address_width,32));
+    AvalonMaster#(address_width,32) masterAdapter <- mkMaster;
+    Reg#(Bit#(address_width)) addrReq <- mkReg(0);
+    Reg#(Bit#(address_width)) addrResp <- mkReg(0);
 
     rule requestAddr;
         masterAdapter.busServer.request.put(AvalonRequest{command: Read, addr: addrReq, data: ?});
@@ -31,6 +31,6 @@ endmodule
 
 (* synthesize *)
 module mkMIPSEmu();
-    let mips <- mkMIPSCPU(mkAvalonMasterEmu);
+    AvalonMasterWires#(21,32) mips <- mkMIPSCPU(mkAvalonMasterEmu);
 endmodule
 
