@@ -15,7 +15,7 @@ module mkMIPSCPU#(module#(AvalonMaster#(address_width,32)) mkMaster) (AvalonMast
     endrule
     rule displayData;
         let data <- masterAdapter.busServer.response.get;
-        if(addrResp >= 10240) $finish();
+        if(addrResp >= 'h500) $finish();
         $display("%h %h", addrResp, data);
         addrResp <= addrResp + 4;
     endrule
