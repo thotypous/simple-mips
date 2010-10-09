@@ -186,7 +186,7 @@ module mkCache(Cache#(address_width,inst_width,data_width))
         outReq.enq(dataReq.first);
         if(dataReq.first.command == Read)
             pendingReq.enq(Data);
-        instReq.deq;
+        dataReq.deq;
     endrule
 
     rule doInstPrefetch(!instReq.notEmpty && !dataReq.notEmpty);
