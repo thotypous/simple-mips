@@ -66,8 +66,8 @@ module mkSingleCache(SingleCache#(address_width,cache_width))
           begin
             if(cacheLine.addr == req.addr &&& cacheLine.data matches tagged Valid .data)
               begin
-                pendingReq.deq;
                 dataResponse.enq(data);
+                pendingReq.deq;
               end
             else
               begin
@@ -159,9 +159,10 @@ module mkCache(Cache#(address_width,inst_width,data_width))
 
     FIFO#(AvalonRequest#(address_width,32)) outReq <- mkBypassFIFO;
     FIFO#(CacheReqType) pendingReq <- mkSizedFIFO(3);
+    FIFO#(Bit#(32)) inResp <- mkBypassFIFO;
 
-    Reg#(Bit#(address_width)) nextPrefetch <- mkReg(0);
-    FIFOF#(Bit#(address_width)) pendingPrefetch <- mkUGFIFOF;
+    Reg#(Bit#(address_width)) nextPrefetch <- mkReg('h404);
+    FIFO#(Bit#(address_width)) pendingPrefetch <- mkFIFO;
 
     mkConnection(instSCache.busClient.request, toPut(instReq));
     mkConnection(dataSCache.busClient.request, toPut(dataReq));
@@ -170,10 +171,13 @@ module mkCache(Cache#(address_width,inst_width,data_width))
 
     rule peekInstReq(instReq.notEmpty && (arbitration == 0 || !dataReq.notEmpty));
         arbitration <= ~arbitration;
-        nextPrefetch <= instReq.first.addr + 4;
+        nextPrefetch <= instReq.first.addr + 8;
         outReq.enq(instReq.first);
         if(instReq.first.command != Read)
-            error("Cache error: Trying to write to the instruction cache");
+          begin
+            $display("Cache error: Trying to write to the instruction cache");
+            $finish();
+          end
         pendingReq.enq(Instruction);
         instReq.deq;
     endrule
@@ -193,6 +197,29 @@ module mkCache(Cache#(address_width,inst_width,data_width))
         nextPrefetch <= nextPrefetch + 4;
     endrule
 
+    (* mutually_exclusive = "peekInstResp, peekDataResp, peekInstPrefetchResp" *)
+
+    rule peekInstResp(pendingReq.first == Instruction);
+        instSCache.busClient.response.put(inResp.first);
+        inResp.deq;
+        pendingReq.deq;
+    endrule
+
+    rule peekDataResp(pendingReq.first == Data);
+        dataSCache.busClient.response.put(inResp.first);
+        inResp.deq;
+        pendingReq.deq;
+    endrule
+
+    rule peekInstPrefetchResp(pendingReq.first == InstructionPrefetch);
+        let cacheLine = CacheLine{addr: pendingPrefetch.first,
+                                  data: tagged Valid inResp.first};
+        instSCache.prefetch.put(cacheLine);
+        inResp.deq;
+        pendingPrefetch.deq;
+        pendingReq.deq;
+    endrule
+
     method Action clear();
         instSCache.clear;
         dataSCache.clear;
@@ -200,22 +227,7 @@ module mkCache(Cache#(address_width,inst_width,data_width))
 
     interface Client busClient;
         interface Get request = toGet(outReq);
-        interface Put response;
-            method Action put(Bit#(32) data);
-                case (pendingReq.first) matches
-                    Instruction: instSCache.busClient.response.put(data);
-                    Data:        dataSCache.busClient.response.put(data);
-                    InstructionPrefetch:
-                      action
-                        let cacheLine = CacheLine{addr: pendingPrefetch.first,
-                                                  data: tagged Valid data};
-                        instSCache.prefetch.put(cacheLine);
-                        pendingPrefetch.deq;
-                      endaction
-                endcase
-                pendingReq.deq;
-            endmethod
-        endinterface
+        interface Put response = toPut(inResp);
     endinterface
 
     interface Server instCache = instSCache.thisCache;
