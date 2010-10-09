@@ -114,8 +114,8 @@ module mkAvalonMaster(AvalonMaster#(address_width,data_width));
   endinterface
 
   interface Server busServer;
-    interface Put request = fifoToPut(reqFIFO);
-    interface Get response = fifoToGet(respFIFO);
+    interface Put request = toPut(reqFIFO);
+    interface Get response = toGet(respFIFO);
   endinterface
 endmodule
 

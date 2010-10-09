@@ -1,5 +1,7 @@
 import ClientServer::*;
 import GetPut::*;
+import SpecialFIFOs::*;
+import BRAM::*;
 import AvalonCommon::*;
 
 interface Cache;
@@ -9,6 +11,13 @@ interface Cache;
 endinterface
 
 module mkCache(Cache);
-    
+    interface busClient;
+    endinterface
+
+    interface instCache;
+    endinterface
+
+    interface dataCache;
+    endinterface
 endmodule
 
