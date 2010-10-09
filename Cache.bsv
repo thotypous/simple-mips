@@ -4,9 +4,11 @@ import FIFO::*;
 import FIFOF::*;
 import SpecialFIFOs::*;
 import BRAM::*;
+import Connectable::*;
 import AvalonCommon::*;
 
-//export Cache(..) mkCache;
+export Cache(..);
+export mkCache;
 
 interface Cache#(numeric type address_width, numeric type inst_width, numeric type data_width);
     method Action clear();
@@ -136,10 +138,60 @@ module mkSingleCache(SingleCache#(address_width,cache_width))
     endinterface
 endmodule
 
-/*
-module mkCache(Cache#(address_width,inst_width,data_width));
+typedef enum {
+  Instruction,
+  Data,
+  InstructionPrefetch
+} CacheReqType deriving (Bits,Eq);
+
+module mkCache(Cache#(address_width,inst_width,data_width))
+              provisos (Add#(a__, data_width, address_width),
+                        Add#(b__, data_width, TAdd#(data_width, 1)),
+                        Add#(c__, inst_width, address_width),
+                        Add#(d__, inst_width, TAdd#(inst_width, 1)));
     SingleCache#(address_width,inst_width) instSCache <- mkSingleCache;
     SingleCache#(address_width,data_width) dataSCache <- mkSingleCache;
+
+    FIFOF#(AvalonRequest#(address_width,32)) instReq <- mkBypassFIFOF;
+    FIFOF#(AvalonRequest#(address_width,32)) dataReq <- mkBypassFIFOF;
+
+    Reg#(Bit#(1)) arbitration <- mkReg(0);
+
+    FIFO#(AvalonRequest#(address_width,32)) outReq <- mkBypassFIFO;
+    FIFO#(CacheReqType) pendingReq <- mkSizedFIFO(3);
+
+    Reg#(Bit#(address_width)) nextPrefetch <- mkReg(0);
+    FIFOF#(Bit#(address_width)) pendingPrefetch <- mkUGFIFOF;
+
+    mkConnection(instSCache.busClient.request, toPut(instReq));
+    mkConnection(dataSCache.busClient.request, toPut(dataReq));
+
+    (* mutually_exclusive = "peekInstReq, peekDataReq, doInstPrefetch" *)
+
+    rule peekInstReq(instReq.notEmpty && (arbitration == 0 || !dataReq.notEmpty));
+        arbitration <= ~arbitration;
+        nextPrefetch <= instReq.first.addr + 4;
+        outReq.enq(instReq.first);
+        if(instReq.first.command != Read)
+            error("Cache error: Trying to write to the instruction cache");
+        pendingReq.enq(Instruction);
+        instReq.deq;
+    endrule
+
+    rule peekDataReq(dataReq.notEmpty && (arbitration == 1 || !instReq.notEmpty));
+        arbitration <= ~arbitration;
+        outReq.enq(dataReq.first);
+        if(dataReq.first.command == Read)
+            pendingReq.enq(Data);
+        instReq.deq;
+    endrule
+
+    rule doInstPrefetch(!instReq.notEmpty && !dataReq.notEmpty);
+        outReq.enq(AvalonRequest{command: Read, addr: nextPrefetch, data: ?});
+        pendingReq.enq(InstructionPrefetch);
+        pendingPrefetch.enq(nextPrefetch);
+        nextPrefetch <= nextPrefetch + 4;
+    endrule
 
     method Action clear();
         instSCache.clear;
@@ -147,10 +199,26 @@ module mkCache(Cache#(address_width,inst_width,data_width));
     endmethod
 
     interface Client busClient;
+        interface Get request = toGet(outReq);
+        interface Put response;
+            method Action put(Bit#(32) data);
+                case (pendingReq.first) matches
+                    Instruction: instSCache.busClient.response.put(data);
+                    Data:        dataSCache.busClient.response.put(data);
+                    InstructionPrefetch:
+                      action
+                        let cacheLine = CacheLine{addr: pendingPrefetch.first,
+                                                  data: tagged Valid data};
+                        instSCache.prefetch.put(cacheLine);
+                        pendingPrefetch.deq;
+                      endaction
+                endcase
+                pendingReq.deq;
+            endmethod
+        endinterface
     endinterface
 
     interface Server instCache = instSCache.thisCache;
     interface Server dataCache = dataSCache.thisCache;
 endmodule
-*/
 
