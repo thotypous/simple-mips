@@ -40,8 +40,7 @@ module mkSingleCache(SingleCache#(address_width,cache_width))
     Integer resetLastBit = valueof(cache_width);
     Bool resetState = resetCounter[resetLastBit] == 1'b0;
 
-    FIFOF#(AvalonRequest#(address_width,32)) pendingReq <- mkFIFOF1;
-    Bool hasPending = pendingReq.notEmpty;
+    FIFO#(AvalonRequest#(address_width,32)) pendingReq <- mkPipelineFIFO;
 
     FIFO#(Bit#(0)) mainMemReq <- mkBypassFIFO;
     FIFO#(Bit#(32)) dataResponse <- mkBypassFIFO;
@@ -121,7 +120,7 @@ module mkSingleCache(SingleCache#(address_width,cache_width))
 
     interface Server thisCache;
         interface Put request;
-            method Action put(AvalonRequest#(address_width,32) req) if (!resetState && !hasPending);
+            method Action put(AvalonRequest#(address_width,32) req) if (!resetState);
                 Bit#(cache_width) address = truncate(req.addr);
                 portAaddr.wset(address);
                 let bramReq = BRAMRequest{write: req.command == Write,
@@ -171,7 +170,7 @@ module mkCache(Cache#(address_width,inst_width,data_width))
 
     rule peekInstReq(instReq.notEmpty && (arbitration == 0 || !dataReq.notEmpty));
         arbitration <= ~arbitration;
-        nextPrefetch <= instReq.first.addr + 8;
+        nextPrefetch <= instReq.first.addr + 4;
         outReq.enq(instReq.first);
         if(instReq.first.command != Read)
           begin

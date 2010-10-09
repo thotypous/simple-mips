@@ -1,6 +1,8 @@
 import ClientServer::*;
 import GetPut::*;
 import BRAM::*;
+import FIFO::*;
+import Connectable::*;
 import AvalonCommon::*;
 import AvalonMaster::*;
 
@@ -9,6 +11,11 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width)) provisos (Add#
   cfg.loadFormat = tagged Hex "program.mem";
   BRAM1Port#(Bit#(TSub#(address_width,TSub#(TLog#(data_width),3))),
              Bit#(data_width)) bram <- mkBRAM1Server(cfg);
+  FIFO#(Bit#(data_width)) delay_stage01 <- mkFIFO;
+  FIFO#(Bit#(data_width)) delay_stage02 <- mkFIFO;
+
+  mkConnection(bram.portA.response,  toPut(delay_stage01));
+  mkConnection(toGet(delay_stage01), toPut(delay_stage02));
 
   interface AvalonMasterWires masterWires;
     method Bit#(1) read() = 0;
@@ -31,7 +38,7 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width)) provisos (Add#
                                            datain: req.data});
       endmethod
     endinterface
-    interface Get response = bram.portA.response;
+    interface Get response = toGet(delay_stage02);
   endinterface
 endmodule
 
