@@ -11,21 +11,36 @@ module mkMIPSCPU#(module#(AvalonMaster#(address_width,32)) mkMaster) (AvalonMast
     AvalonMaster#(address_width,32) masterAdapter <- mkMaster;
     Cache#(address_width,10,10) cache <- mkCache;
     
-    Reg#(Bit#(address_width)) addrReq <- mkReg('h400);
-    Reg#(Bit#(address_width)) addrResp <- mkReg('h400);
+    Reg#(Bit#(address_width)) addrInstReq <- mkReg('h400);
+    Reg#(Bit#(address_width)) addrInstResp <- mkReg('h400);
+    Reg#(Bit#(address_width)) addrDataReq <- mkReg('h400);
+    Reg#(Bit#(address_width)) addrDataResp <- mkReg('h400);
 
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
     mkConnection(masterAdapter.busServer.response, cache.busClient.response);
 
-    rule requestAddr;
-        cache.instCache.request.put(AvalonRequest{command: Read, addr: addrReq, data: ?});
-        addrReq <= addrReq + 4;
+    rule requestInstAddr;
+        cache.instCache.request.put(AvalonRequest{command: Read, addr: addrInstReq, data: ?});
+        addrInstReq <= addrInstReq + 4;
     endrule
-    rule displayData;
+    rule displayInstData;
         let data <- cache.instCache.response.get;
-        if(addrResp >= 'h800) $finish();
-        $display("%h %h", addrResp, data);
-        addrResp <= addrResp + 4;
+        $display("I> %h %h", addrInstResp, data);
+        addrInstResp <= addrInstResp + 4;
+    endrule
+
+    rule requestDataAddr;
+        cache.dataCache.request.put(AvalonRequest{command: Read, addr: addrDataReq, data: ?});
+        addrDataReq <= addrDataReq + 4;
+    endrule
+    rule displayDataData;
+        let data <- cache.dataCache.response.get;
+        $display("D> %h %h", addrDataResp, data);
+        addrDataResp <= addrDataResp + 4;
+    endrule
+
+    rule doFinish;
+        if(addrInstResp >= 'h800 && addrDataResp >= 'h800) $finish();
     endrule
 
     return masterAdapter.masterWires;

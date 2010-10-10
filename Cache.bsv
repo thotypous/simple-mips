@@ -157,11 +157,11 @@ module mkCache(Cache#(address_width,inst_width,data_width))
     Reg#(Bit#(1)) arbitration <- mkReg(0);
 
     FIFO#(AvalonRequest#(address_width,32)) outReq <- mkBypassFIFO;
-    FIFO#(CacheReqType) pendingReq <- mkSizedFIFO(3);
+    FIFO#(CacheReqType) pendingReq <- mkFIFO;
     FIFO#(Bit#(32)) inResp <- mkBypassFIFO;
 
-    Reg#(Bit#(address_width)) nextPrefetch <- mkReg('h404);
-    FIFO#(Bit#(address_width)) pendingPrefetch <- mkFIFO;
+    Reg#(Bit#(address_width)) nextPrefetch <- mkReg('h400);
+    FIFOF#(Bit#(address_width)) pendingPrefetch <- mkFIFOF1;
 
     mkConnection(instSCache.busClient.request, toPut(instReq));
     mkConnection(dataSCache.busClient.request, toPut(dataReq));
@@ -170,7 +170,7 @@ module mkCache(Cache#(address_width,inst_width,data_width))
 
     rule peekInstReq(instReq.notEmpty && (arbitration == 0 || !dataReq.notEmpty));
         arbitration <= ~arbitration;
-        nextPrefetch <= instReq.first.addr + 4;
+        nextPrefetch <= instReq.first.addr + 'hc;
         outReq.enq(instReq.first);
         if(instReq.first.command != Read)
           begin
