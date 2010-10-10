@@ -29,7 +29,7 @@ typedef struct {
     Maybe#(Bit#(32)) data;
 } CacheLine#(numeric type address_width) deriving (Bits, Eq);
 
-module mkSingleCache(SingleCache#(address_width,cache_width))
+module mkSingleCache#(function Bool ignoreCache(Bit#(address_width) addr)) (SingleCache#(address_width,cache_width))
                     provisos (Add#(a__, cache_width, address_width),
                               Add#(b__, cache_width, TAdd#(cache_width, 1)));
     BRAM_Configure cfg = defaultValue;
@@ -63,7 +63,7 @@ module mkSingleCache(SingleCache#(address_width,cache_width))
         let req = pendingReq.first;
         if(req.command == Read)
           begin
-            if(cacheLine.addr == req.addr &&& cacheLine.data matches tagged Valid .data)
+            if(!ignoreCache(req.addr) && cacheLine.addr == req.addr &&& cacheLine.data matches tagged Valid .data)
               begin
                 dataResponse.enq(data);
                 pendingReq.deq;
@@ -143,13 +143,14 @@ typedef enum {
   InstructionPrefetch
 } CacheReqType deriving (Bits,Eq);
 
-module mkCache(Cache#(address_width,inst_width,data_width))
+module mkCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Cache#(address_width,inst_width,data_width))
               provisos (Add#(a__, data_width, address_width),
                         Add#(b__, data_width, TAdd#(data_width, 1)),
                         Add#(c__, inst_width, address_width),
                         Add#(d__, inst_width, TAdd#(inst_width, 1)));
-    SingleCache#(address_width,inst_width) instSCache <- mkSingleCache;
-    SingleCache#(address_width,data_width) dataSCache <- mkSingleCache;
+    function ignoreNever(Bit#(address_width) addr) = False;
+    SingleCache#(address_width,inst_width) instSCache <- mkSingleCache(ignoreNever);
+    SingleCache#(address_width,data_width) dataSCache <- mkSingleCache(ignoreCache);
 
     FIFOF#(AvalonRequest#(address_width,32)) instReq <- mkBypassFIFOF;
     FIFOF#(AvalonRequest#(address_width,32)) dataReq <- mkBypassFIFOF;
