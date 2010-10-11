@@ -40,7 +40,7 @@ interface AvalonMasterWires#(numeric type address_width, numeric type data_width
   method Bit#(1) write();
 
   (* always_ready, always_enabled, prefix="", result="address" *) 
-  method Bit#(address_width) address();
+  method Bit#(TAdd#(address_width,TSub#(TLog#(data_width),3))) address();
 
   (* always_ready, always_enabled, prefix="", result="writedata" *) 
   method Bit#(data_width) writedata();  
@@ -60,7 +60,7 @@ interface AvalonMaster#(numeric type address_width, numeric type data_width);
   interface Server#(AvalonRequest#(address_width,data_width), Bit#(data_width)) busServer;
 endinterface
 
-module mkAvalonMaster(AvalonMaster#(address_width,data_width));
+module mkAvalonMaster(AvalonMaster#(address_width,data_width)) provisos (Add#(a__, address_width, TAdd#(address_width, TSub#(TLog#(data_width), 3))));
   FIFO#(AvalonRequest#(address_width,data_width)) reqFIFO <- mkBypassFIFO;
   FIFO#(Bit#(data_width)) respFIFO <- mkBypassFIFO;
 
@@ -94,7 +94,7 @@ module mkAvalonMaster(AvalonMaster#(address_width,data_width));
   
     method Bit#(1) write() = fromMaybe(0, writeOut.wget);
 
-    method Bit#(address_width) address() = fromMaybe(0, addrOut.wget);
+    method Bit#(TAdd#(address_width,TSub#(TLog#(data_width),3))) address() = zeroExtend(fromMaybe(0, addrOut.wget)) << valueof(TSub#(TLog#(data_width),3));
 
     method Bit#(data_width) writedata() = fromMaybe(0, dataOut.wget);
 
