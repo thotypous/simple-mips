@@ -171,7 +171,7 @@ module mkCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Cache#(add
 
     rule peekInstReq(instReq.notEmpty && (arbitration == 0 || !dataReq.notEmpty));
         arbitration <= ~arbitration;
-        nextPrefetch <= instReq.first.addr + 'hc;
+        nextPrefetch <= instReq.first.addr + 3;
         outReq.enq(instReq.first);
         if(instReq.first.command != Read)
           begin
@@ -194,7 +194,7 @@ module mkCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Cache#(add
         outReq.enq(AvalonRequest{command: Read, addr: nextPrefetch, data: ?});
         pendingReq.enq(InstructionPrefetch);
         pendingPrefetch.enq(nextPrefetch);
-        nextPrefetch <= nextPrefetch + 4;
+        nextPrefetch <= nextPrefetch + 1;
     endrule
 
     (* mutually_exclusive = "peekInstResp, peekDataResp, peekInstPrefetchResp" *)
