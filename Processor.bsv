@@ -145,8 +145,8 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
                 endaction
             tagged MULTU .s:
                 action
-                    UInt#(64) r1 = unpack(signExtend(rf.rd1(s.rs)));
-                    UInt#(64) r2 = unpack(signExtend(rf.rd2(s.rt)));
+                    UInt#(64) r1 = unpack(zeroExtend(rf.rd1(s.rs)));
+                    UInt#(64) r2 = unpack(zeroExtend(rf.rd2(s.rt)));
                     Bit#(64) mult = pack(r1*r2);
                     hi <= mult[63:32];
                     lo <= mult[31: 0];
