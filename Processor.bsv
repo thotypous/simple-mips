@@ -2,6 +2,7 @@ import ClientServer::*;
 import GetPut::*;
 import Connectable::*;
 import FIFO::*;
+import FIFOF::*;
 import SpecialFIFOs::*;
 import RegFile::*;
 import FShow::*;
@@ -10,33 +11,8 @@ import AvalonMaster::*;
 import AvalonMasterEmu::*;
 import Cache::*;
 import Instructions::*;
-
-interface RFile;
-    method Action wr(Ridx ridx, Bit#(32) data);
-    method Bit#(32) rd1(Ridx ridx);
-    method Bit#(32) rd2(Ridx ridx);
-endinterface
-
-module mkRFile(RFile);
-    RegFile#(Ridx,Bit#(32)) rf <- mkRegFileWCF(0,31);
-    RWire#(Tuple2#(Ridx,Bit#(32))) rwout <- mkRWire;
-    method Action wr(Ridx ridx, Bit#(32) data);
-        rf.upd(ridx, data);
-        rwout.wset(tuple2(ridx, data));
-    endmethod
-    method Bit#(32) rd1(Ridx ridx);
-        case (rwout.wget) matches
-            tagged Valid {.wr,.d}: return (ridx == 0) ? 0 : (wr==ridx) ? d : rf.sub(ridx);
-		    tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
-        endcase
-    endmethod
-    method Bit#(32) rd2(Ridx ridx);
-        case (rwout.wget) matches
-            tagged Valid {.wr,.d}: return (ridx == 0) ? 0 : (wr==ridx) ? d : rf.sub(ridx);
-		    tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
-        endcase
-    endmethod
-endmodule
+import Trace::*;
+import RFile::*;
 
 module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
                   function Bool ignoreCache(Bit#(address_width) addr))
@@ -45,32 +21,38 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
 
     AvalonMaster#(address_width,32) masterAdapter <- mkMaster;
     Cache#(address_width,12,12) cache <- mkCache(ignoreCache);
-    
-    RWire#(Bit#(address_width)) newpc <- mkRWire;
+    FIFOF#(Bit#(address_width)) jumpTo <- mkBypassFIFOF;
     Reg#(Bit#(address_width)) pc <- mkReg('h100);
-
+    Reg#(Bit#(11)) cycles <- mkReg(0);
     RFile rf <- mkRFile; 
-
-    Reg#(Bool) first <- mkReg(True);
 
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
     mkConnection(masterAdapter.busServer.response, cache.busClient.response);
 
-    rule fetchStage;
+    rule fetchAhead(!jumpTo.notEmpty);
+        trace($format("[Fetch] pc=%h", pc));
         cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
-        $display("fetching %h", pc);
-        pc <= fromMaybe(pc + 1, newpc.wget);
+        pc <= pc + 1;
     endrule
 
-    rule execStage;
+    rule fetchJump(jumpTo.notEmpty);
+        trace($format("[Fetch] [jump %h] pc=%h", jumpTo.first, pc));
+        cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
+        pc <= jumpTo.first;
+        jumpTo.deq;
+    endrule
+
+    rule exec;
         Instr instr <- liftM(unpack)(cache.instCache.response.get);
-        $display(fshow(instr));
-        if(first)
-            newpc.wset('h109);
-        first <= False;
+        trace($format("[Exec] ")+fshow(instr));
+        if(instr matches tagged JAL .s)
+            jumpTo.enq('h109);
+        if(instr matches tagged JR .s)
+            jumpTo.enq('h100);
+        cycles <= cycles + 1;
     endrule
 
-    rule finish(pc >= 'h130);
+    rule finish(cycles > 1024);
         $finish;
     endrule
 
