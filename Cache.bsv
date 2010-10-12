@@ -161,7 +161,7 @@ module mkCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Cache#(add
     FIFO#(CacheReqType) pendingReq <- mkFIFO;
     FIFO#(Bit#(32)) inResp <- mkBypassFIFO;
 
-    Reg#(Bit#(address_width)) nextPrefetch <- mkReg('h400);
+    Reg#(Bit#(address_width)) nextPrefetch <- mkReg('h100);
     FIFOF#(Bit#(address_width)) pendingPrefetch <- mkFIFOF1;
 
     mkConnection(instSCache.busClient.request, toPut(instReq));
