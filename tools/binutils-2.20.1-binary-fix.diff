@@ -1,0 +1,42 @@
+This was made when sleeping. I make no warranties.
+
+--- binutils-2.20.1/bfd/binary.c.old	2010-10-07 01:59:30.000000000 -0300
++++ binutils-2.20.1/bfd/binary.c	2010-10-07 02:11:51.215720838 -0300
+@@ -49,9 +49,37 @@
+ 
+ /* Create a binary object.  Invoked via bfd_set_format.  */
+ 
++/* When we write out an ihex value, the values can not be output as
++   they are seen.  Instead, we hold them in memory in this structure.  */
++
++struct ihex_data_list
++{
++  struct ihex_data_list *next;
++  bfd_byte *data;
++  bfd_vma where;
++  bfd_size_type size;
++};
++
++/* The ihex tdata information.  */
++
++struct ihex_data_struct
++{
++  struct ihex_data_list *head;
++  struct ihex_data_list *tail;
++};
++
+ static bfd_boolean
+ binary_mkobject (bfd *abfd ATTRIBUTE_UNUSED)
+ {
++  struct ihex_data_struct *tdata;
++
++  tdata = (struct ihex_data_struct *) bfd_alloc (abfd, sizeof (* tdata));
++  if (tdata == NULL)
++    return FALSE;
++
++  abfd->tdata.ihex_data = tdata;
++  tdata->head = NULL;
++  tdata->tail = NULL;
+   return TRUE;
+ }
+ 
