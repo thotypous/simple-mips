@@ -63,7 +63,6 @@ module mkSingleCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Sing
         let req = pendingReq.first;
         if(req.command == Read)
           begin
-            $display("cache response addr %h real addr %h data %h ignore %h", req.addr, cacheLine.addr, pack(cacheLine.data), pack(ignoreCache(req.addr)));
             if(!ignoreCache(req.addr) && cacheLine.addr == req.addr &&& cacheLine.data matches tagged Valid .data)
               begin
                 dataResponse.enq(data);
