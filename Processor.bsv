@@ -211,8 +211,12 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
                     Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbSW{data:rf.rd2(s.rt), addr:truncate(addr>>2)});
                 endaction
-            tagged BREAK   : $finish();
-            tagged SYNC    : clearCache <= True;
+            tagged SYSC  .s:
+                case (s.sc)
+                    20'h0000: $finish();
+                    20'h0001: $display("[syscall 1] $a0=%h", rf.rd1(4));
+                    20'h00ff: clearCache <= True;
+                endcase
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
     endrule
