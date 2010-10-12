@@ -25,6 +25,22 @@ typedef union tagged {
     struct { Bit#(32) data; Bit#(24) addr;               } WbSW;
 } WBOp deriving (Eq, Bits);
 
+instance FShow#(WBOp);
+    function Fmt fshow(WBOp op);
+        case (op) matches
+            tagged WbREG .s: return $format("WbREG{r:%0d,data:%h}", s.r, s.data);
+            tagged WbLB  .s: return $format("WbLB {r:%0d,addr:%h,line:%h}", s.r, s.addr, s.line);
+            tagged WbLBU .s: return $format("WbLBU{r:%0d,addr:%h,line:%h}", s.r, s.addr, s.line);
+            tagged WbLH  .s: return $format("WbLH {r:%0d,addr:%h,line:%h}", s.r, s.addr, s.line);
+            tagged WbLHU .s: return $format("WbLHU{r:%0d,addr:%h,line:%h}", s.r, s.addr, s.line);
+            tagged WbLW  .s: return $format("WbLW {r:%0d,addr:%h}", s.r, s.addr);
+            tagged WbSB  .s: return $format("WbSB {data:%h,addr:%h,line:%h}", s.data, s.addr, s.line);
+            tagged WbSH  .s: return $format("WbSH {data:%h,addr:%h,line:%h}", s.data, s.addr, s.line);
+            tagged WbSW  .s: return $format("WbSW {data:%h,addr:%h}", s.data, s.addr);
+        endcase
+    endfunction
+endinstance
+
 module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignoreCache(Bit#(24) addr)) (AvalonMasterWires#(24,32));
     AvalonMaster#(24,32) masterAdapter <- mkMaster;
     Cache#(24,12,12) cache <- mkCache(ignoreCache);
@@ -41,19 +57,26 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     Reg#(Bit#(32)) lo <- mkReg(0);
     Reg#(Bit#(32)) hi <- mkReg(0);
 
+    Reg#(Bool) clearCache <- mkReg(False);
+
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
     mkConnection(masterAdapter.busServer.response, cache.busClient.response);
     mkConnection(cache.instCache.response, toPut(instFIFO));
     mkConnection(cache.dataCache.response, toPut(dataFIFO));
 
-    rule fetchAhead(!jumpTo.notEmpty);
+    rule clearTheCaches(clearCache);
+        clearCache <= False;
+        cache.clear;
+    endrule
+
+    rule fetchAhead(!jumpTo.notEmpty && !clearCache);
         trace($format("[Fetch %h]", fetchPC));
         cache.instCache.request.put(AvalonRequest{command: Read, addr: fetchPC, data: ?});
         execPC.enq(fetchPC);
         fetchPC <= fetchPC + 1;
     endrule
 
-    rule fetchJump(jumpTo.notEmpty);
+    rule fetchJump(jumpTo.notEmpty && !clearCache);
         trace($format("[Fetch %h] [jump %h]", fetchPC, jumpTo.first));
         cache.instCache.request.put(AvalonRequest{command: Read, addr: fetchPC, data: ?});
         execPC.enq(fetchPC);
@@ -61,7 +84,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
         jumpTo.deq;
     endrule
 
-    rule exec(!pendingLoad.notEmpty);
+    rule exec(!pendingLoad.notEmpty && !clearCache);
         Instr inst = unpack(instFIFO.first);
         let pc  = execPC.first;
         let pc1 = pc+1;
@@ -150,51 +173,54 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             tagged JR    .s: jumpTo.enq(truncate(rf.rd1(s.rs)>>2));
             tagged LB    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbLB{r:s.rt, addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged LBU   .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbLBU{r:s.rt, addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged LH    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbLH{r:s.rt, addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged LHU   .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbLHU{r:s.rt, addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged LW    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbLW{r:s.rt, addr:truncate(addr>>2)});
                 endaction
             tagged SB    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbSB{data:truncate(rf.rd2(s.rt)), addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged SH    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbSH{data:truncate(rf.rd2(s.rt)), addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged SW    .s:
                 action
-                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(32) addr = rf.rd1(s.rb)+signExtend(s.of);
                     execToWB.enq(WbSW{data:rf.rd2(s.rt), addr:truncate(addr>>2)});
                 endaction
+            tagged BREAK   : $finish();
+            tagged SYNC    : clearCache <= True;
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
     endrule
 
-    rule wbLoadResult(dataFIFO.notEmpty);
+    rule wbLoadResult(dataFIFO.notEmpty && !clearCache);
         let wbOp = pendingLoad.first;
         let data = dataFIFO.first;
+        trace($format("[wbLoadResult] [data=%h] ",data)+fshow(wbOp));
         function Bit#(8) byteLine(Bit#(32) d, Bit#(2) line); 
             return (case(line)
                 2'h0: d[31:24];
@@ -242,8 +268,9 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
         pendingLoad.deq;
     endrule
 
-    rule wbFromExec(!dataFIFO.notEmpty);
+    rule wbFromExec(!dataFIFO.notEmpty && !clearCache);
         let wbOp = execToWB.first;
+        trace($format("[wbFromExec] ")+fshow(wbOp));
         function Action reqLoad(Bit#(24) addr) = action
             cache.dataCache.request.put(AvalonRequest{command:Read, addr:truncate(addr), data:?});
             pendingLoad.enq(wbOp);

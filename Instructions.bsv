@@ -72,6 +72,10 @@ typedef union tagged {
     struct { Ridx rb; Ridx rt; Moff of; } SH;
     struct { Ridx rb; Ridx rt; Moff of; } SW;
 
+    // Instructions that deviate from the standard behaviour
+    void BREAK;      // Finish the emulator
+    void SYNC;       // Clear the cache memory    
+
     void ILLEGAL;
 } Instr deriving(Eq);
 
@@ -105,6 +109,8 @@ SpecOp soMFHI    = 6'b010000;
 SpecOp soMFLO    = 6'b010010;
 SpecOp soJALR    = 6'b001001;
 SpecOp soJR      = 6'b001000;
+SpecOp soBREAK   = 6'b001101;
+SpecOp soSYNC    = 6'b001111;
 
 Opcode opADDI    = 6'b001000;
 Opcode opADDIU   = 6'b001001;
@@ -189,6 +195,8 @@ instance Bits#(Instr, 32);
             tagged SB    .s: return { opSB,      s.rb, s.rt, s.of                };
             tagged SH    .s: return { opSB,      s.rb, s.rt, s.of                };
             tagged SW    .s: return { opSW,      s.rb, s.rt, s.of                };
+            tagged BREAK   : return { opSPECIAL,                  20'b0, soBREAK };
+            tagged SYNC    : return { opSPECIAL,                  20'b0, soSYNC  };
             tagged ILLEGAL : return 0;
         endcase
     endfunction
@@ -233,6 +241,8 @@ instance Bits#(Instr, 32);
                     soMFLO:  return MFLO  {rd:rd              };
                     soJALR:  return JALR  {rs:rs, rd:rd       };
                     soJR:    return JR    {rs:rs              };
+                    soBREAK: return BREAK;
+                    soSYNC:  return SYNC;
                 endcase
             opADDI:  return ADDI  { rs:rs, rt:rt, im:im };
             opADDIU: return ADDIU { rs:rs, rt:rt, im:im };
@@ -318,6 +328,8 @@ instance FShow#(Instr);
             tagged SB    .s: return $format("sb r%0d, 0x%x(r%0d)",    s.rt, s.of, s.rb);
             tagged SH    .s: return $format("sh r%0d, 0x%x(r%0d)",    s.rt, s.of, s.rb);
             tagged SW    .s: return $format("sw r%0d, 0x%x(r%0d)",    s.rt, s.of, s.rb);
+            tagged BREAK   : return $format("break");
+            tagged SYNC    : return $format("sync");
             tagged ILLEGAL : return $format("illegal instruction");
         endcase
     endfunction
