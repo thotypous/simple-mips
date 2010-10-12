@@ -162,12 +162,12 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             tagged J     .s: jumpTo.enq(truncate(s.tg));
             tagged JAL   .s:
                 action
-                    execToWB.enq(WbREG{r:31, data:zeroExtend(pc+2)});
+                    execToWB.enq(WbREG{r:31, data:zeroExtend(pc+2)<<2});
                     jumpTo.enq(truncate(s.tg));
                 endaction
             tagged JALR  .s:
                 action
-                    execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pc+2)});
+                    execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pc+2)<<2});
                     jumpTo.enq(truncate(rf.rd1(s.rs)>>2));
                 endaction
             tagged JR    .s: jumpTo.enq(truncate(rf.rd1(s.rs)>>2));
