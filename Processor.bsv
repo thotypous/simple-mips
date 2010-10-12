@@ -32,7 +32,9 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
                   function Bool ignoreCache(Bit#(address_width) addr))
                   (AvalonMasterWires#(address_width,32))
                   provisos (Add#(a__, CacheWidth, address_width),
-                            Add#(b__, address_width, MaxAddrWidth));
+                            Add#(b__, address_width, MaxAddrWidth),
+                            Add#(c__, address_width, 32),
+                            Add#(d__, 16, address_width));
 
     AvalonMaster#(address_width,32) masterAdapter <- mkMaster;
     Cache#(address_width,CacheWidth,CacheWidth) cache <- mkCache(ignoreCache);
@@ -67,60 +69,112 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
 
     rule exec(!pendingLoad.notEmpty);
         Instr inst = unpack(instFIFO.first);
-        let pc = execPC.first;
+        let pc  = execPC.first;
+        let pc1 = pc+1;
         trace($format("[Exec  %h] ", pc)+fshow(inst));
         instFIFO.deq;
         execPC.deq;
 
+        function Bit#(32) zextSh(Sham sh) = zeroExtend(sh);
+        function Bit#(32) zextTg(Jtgt tg) = zeroExtend(tg);
+
         case (inst) matches
-            tagged ADD   .s: 
-            tagged ADDI  .s: 
-            tagged ADDIU .s: 
-            tagged ADDU  .s: 
-            tagged LUI   .s: 
-            tagged SUB   .s: 
-            tagged SUBU  .s: 
-            tagged SLL   .s: 
-            tagged SLLV  .s: 
-            tagged SRA   .s: 
-            tagged SRAV  .s: 
-            tagged SRL   .s: 
-            tagged SRLV  .s: 
-            tagged AND   .s: 
-            tagged ANDI  .s: 
-            tagged NOR   .s: 
-            tagged OR    .s: 
-            tagged ORI   .s: 
-            tagged XOR   .s: 
-            tagged XORI  .s: 
-            tagged SLT   .s: 
-            tagged SLTI  .s: 
-            tagged SLTIU .s: 
-            tagged SLTU  .s: 
-            tagged DIV   .s: 
-            tagged DIVU  .s: 
-            tagged MULT  .s: 
-            tagged MULTU .s: 
-            tagged MFHI  .s: 
-            tagged MFLO  .s: 
-            tagged BEQ   .s: 
-            tagged BGEZ  .s: 
-            tagged BGTZ  .s: 
-            tagged BLEZ  .s: 
-            tagged BLTZ  .s: 
-            tagged BNE   .s: 
-            tagged J     .s: 
-            tagged JAL   .s: 
+            tagged ADD   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)+rf.rd2(s.rt)                                });
+            tagged ADDI  .s: execToWB.enq(WbREG{r:s.rt, data:rf.rd1(s.rs)+signExtend(s.im)                            });
+            tagged ADDIU .s: execToWB.enq(WbREG{r:s.rt, data:rf.rd1(s.rs)+signExtend(s.im)                            });
+            tagged ADDU  .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)+rf.rd2(s.rt)                                });
+            tagged LUI   .s: execToWB.enq(WbREG{r:s.rt, data:{s.im,16'b0}                                             });
+            tagged SUB   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)-rf.rd2(s.rt)                                });
+            tagged SUBU  .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)-rf.rd2(s.rt)                                });
+            tagged SLL   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rt)<<zextSh(s.sa)                               });
+            tagged SLLV  .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rt)<<zextSh(rf.rd2(s.rs)[4:0])                  });
+            tagged SRA   .s: execToWB.enq(WbREG{r:s.rd, data:signedShiftRight(rf.rd1(s.rt),zextSh(s.sa))              });
+            tagged SRAV  .s: execToWB.enq(WbREG{r:s.rd, data:signedShiftRight(rf.rd1(s.rt),zextSh(rf.rd2(s.rs)[4:0])) });
+            tagged SRL   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rt)>>zextSh(s.sa)                               });
+            tagged SRLV  .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rt)>>zextSh(rf.rd2(s.rs)[4:0])                  });
+            tagged AND   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)&rf.rd2(s.rt)                                });
+            tagged ANDI  .s: execToWB.enq(WbREG{r:s.rt, data:rf.rd1(s.rs)&zeroExtend(s.im)                            });
+            tagged NOR   .s: execToWB.enq(WbREG{r:s.rd, data:~(rf.rd1(s.rs)|rf.rd2(s.rt))                             });
+            tagged OR    .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)|rf.rd2(s.rt)                                });
+            tagged ORI   .s: execToWB.enq(WbREG{r:s.rt, data:rf.rd1(s.rs)|zeroExtend(s.im)                            });
+            tagged XOR   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)^rf.rd2(s.rt)                                });
+            tagged XORI  .s: execToWB.enq(WbREG{r:s.rt, data:rf.rd1(s.rs)^zeroExtend(s.im)                            });
+            tagged SLT   .s: execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),rf.rd2(s.rt))))    });
+            tagged SLTI  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),signExtend(s.im))))});
+            tagged SLTIU .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<signExtend(s.im)) )});
+            tagged SLTU  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<rf.rd2(s.rt)))     });
+            tagged DIV   .s: noAction;
+            tagged DIVU  .s: noAction;
+            tagged MULT  .s: noAction;
+            tagged MULTU .s: noAction;
+            tagged MFHI  .s: noAction;
+            tagged MFLO  .s: noAction;
+            tagged BEQ   .s: if(rf.rd1(s.rs)==rf.rd2(s.rt)) jumpTo.enq(pc1 + signExtend(s.of));
+            tagged BGEZ  .s: if(signedGE(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
+            tagged BGTZ  .s: if(signedGT(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
+            tagged BLEZ  .s: if(signedLE(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
+            tagged BLTZ  .s: if(signedLT(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
+            tagged BNE   .s: if(rf.rd1(s.rs)!=rf.rd2(s.rt)) jumpTo.enq(pc1 + signExtend(s.of));
+            tagged J     .s: jumpTo.enq(truncate(zextTg(s.tg)));
+            tagged JAL   .s:
+                action
+                    execToWB.enq(WbREG{r:31, data:zeroExtend(pc+2)});
+                    jumpTo.enq(truncate(zextTg(s.tg)));
+                endaction
             tagged JALR  .s:
-            tagged JR    .s:
+                action
+                    execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pc+2)});
+                    jumpTo.enq(truncate(rf.rd1(s.rs)));
+                endaction
+            tagged JR    .s: jumpTo.enq(truncate(rf.rd1(s.rs)));
             tagged LB    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbLB{r:s.rt, addr:zeroExtend(addr), line:absaddr[1:0]});
+                endaction
             tagged LBU   .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbLBU{r:s.rt, addr:zeroExtend(addr), line:absaddr[1:0]});
+                endaction
             tagged LH    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbLH{r:s.rt, addr:zeroExtend(addr), line:absaddr[1]});
+                endaction
             tagged LHU   .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbLHU{r:s.rt, addr:zeroExtend(addr), line:absaddr[1]});
+                endaction
             tagged LW    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbLW{r:s.rt, addr:zeroExtend(addr)});
+                endaction
             tagged SB    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbSB{data:truncate(rf.rd2(s.rt)), addr:zeroExtend(addr), line:absaddr[1:0]});
+                endaction
             tagged SH    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbSH{data:truncate(rf.rd2(s.rt)), addr:zeroExtend(addr), line:absaddr[1]});
+                endaction
             tagged SW    .s:
+                action
+                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    Bit#(address_width) addr = truncate(absaddr>>2);
+                    execToWB.enq(WbSW{data:rf.rd2(s.rt), addr:zeroExtend(addr)});
+                endaction
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
     endrule
