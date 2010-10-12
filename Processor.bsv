@@ -13,39 +13,33 @@ import Instructions::*;
 import Trace::*;
 import RFile::*;
 
-typedef 12 CacheWidth;
-typedef 24 MaxAddrWidth;
-
 typedef union tagged {
-    struct { Ridx     r;    Bit#(32) data;                         } WbREG;
-    struct { Ridx     r;    Bit#(MaxAddrWidth) addr; Bit#(2) line; } WbLB;
-    struct { Ridx     r;    Bit#(MaxAddrWidth) addr; Bit#(2) line; } WbLBU;
-    struct { Ridx     r;    Bit#(MaxAddrWidth) addr; Bit#(1) line; } WbLH;
-    struct { Ridx     r;    Bit#(MaxAddrWidth) addr; Bit#(1) line; } WbLHU;
-    struct { Ridx     r;    Bit#(MaxAddrWidth) addr;               } WbLW;
-    struct { Bit#( 8) data; Bit#(MaxAddrWidth) addr; Bit#(2) line; } WbSB;
-    struct { Bit#(16) data; Bit#(MaxAddrWidth) addr; Bit#(1) line; } WbSH;
-    struct { Bit#(32) data; Bit#(MaxAddrWidth) addr;               } WbSW;
-} WBOp#(numeric type address_width) deriving (Eq, Bits);
+    struct { Ridx     r;    Bit#(32) data;               } WbREG;
+    struct { Ridx     r;    Bit#(24) addr; Bit#(2) line; } WbLB;
+    struct { Ridx     r;    Bit#(24) addr; Bit#(2) line; } WbLBU;
+    struct { Ridx     r;    Bit#(24) addr; Bit#(1) line; } WbLH;
+    struct { Ridx     r;    Bit#(24) addr; Bit#(1) line; } WbLHU;
+    struct { Ridx     r;    Bit#(24) addr;               } WbLW;
+    struct { Bit#( 8) data; Bit#(24) addr; Bit#(2) line; } WbSB;
+    struct { Bit#(16) data; Bit#(24) addr; Bit#(1) line; } WbSH;
+    struct { Bit#(32) data; Bit#(24) addr;               } WbSW;
+} WBOp deriving (Eq, Bits);
 
-module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
-                  function Bool ignoreCache(Bit#(address_width) addr))
-                  (AvalonMasterWires#(address_width,32))
-                  provisos (Add#(a__, CacheWidth, address_width),
-                            Add#(b__, address_width, MaxAddrWidth),
-                            Add#(c__, address_width, 32),
-                            Add#(d__, 16, address_width));
+module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignoreCache(Bit#(24) addr)) (AvalonMasterWires#(24,32));
+    AvalonMaster#(24,32) masterAdapter <- mkMaster;
+    Cache#(24,12,12) cache <- mkCache(ignoreCache);
 
-    AvalonMaster#(address_width,32) masterAdapter <- mkMaster;
-    Cache#(address_width,CacheWidth,CacheWidth) cache <- mkCache(ignoreCache);
-    Reg  #(Bit#(address_width)) fetchPC <- mkReg('h100);
-    FIFOF#(Bit#(address_width)) jumpTo <- mkBypassFIFOF;
-    FIFOF#(Bit#(address_width)) execPC <- mkPipelineFIFOF;
+    Reg  #(Bit#(24)) fetchPC <- mkReg('h100);
+    FIFOF#(Bit#(24)) jumpTo <- mkBypassFIFOF;
+    FIFOF#(Bit#(24)) execPC <- mkPipelineFIFOF;
     FIFOF#(Bit#(32)) instFIFO <- mkBypassFIFOF;
     FIFOF#(Bit#(32)) dataFIFO <- mkBypassFIFOF;
-    FIFOF#(WBOp#(address_width)) pendingLoad <- mkPipelineFIFOF;
-    FIFOF#(WBOp#(address_width)) execToWB <- mkPipelineFIFOF;
-    RFile rf <- mkRFile; 
+    FIFOF#(WBOp) pendingLoad <- mkPipelineFIFOF;
+    FIFOF#(WBOp) execToWB <- mkPipelineFIFOF;
+
+    RFile rf <- mkRFile;
+    Reg#(Bit#(32)) lo <- mkReg(0);
+    Reg#(Bit#(32)) hi <- mkReg(0);
 
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
     mkConnection(masterAdapter.busServer.response, cache.busClient.response);
@@ -76,7 +70,6 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
         execPC.deq;
 
         function Bit#(32) zextSh(Sham sh) = zeroExtend(sh);
-        function Bit#(32) zextTg(Jtgt tg) = zeroExtend(tg);
 
         case (inst) matches
             tagged ADD   .s: execToWB.enq(WbREG{r:s.rd, data:rf.rd1(s.rs)+rf.rd2(s.rt)                                });
@@ -103,77 +96,97 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
             tagged SLTI  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),signExtend(s.im))))});
             tagged SLTIU .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<signExtend(s.im)) )});
             tagged SLTU  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<rf.rd2(s.rt)))     });
-            tagged DIV   .s: noAction;
-            tagged DIVU  .s: noAction;
-            tagged MULT  .s: noAction;
-            tagged MULTU .s: noAction;
-            tagged MFHI  .s: noAction;
-            tagged MFLO  .s: noAction;
+            tagged DIV   .s: 
+                action
+                    Int#(32) r1 = unpack(rf.rd1(s.rs));
+                    Int#(32) r2 = unpack(rf.rd2(s.rt));
+                    r2 = r2 == 0 ? 1 : r2;  // make the simulator happy
+                    lo <= pack(r1 / r2);
+                    hi <= pack(r1 % r2);
+                endaction
+            tagged DIVU  .s:
+                action
+                    UInt#(32) r1 = unpack(rf.rd1(s.rs));
+                    UInt#(32) r2 = unpack(rf.rd2(s.rt));
+                    r2 = r2 == 0 ? 1 : r2;  // make the simulator happy
+                    lo <= pack(r1 / r2);
+                    hi <= pack(r1 % r2);
+                endaction
+            tagged MULT  .s:
+                action
+                    Int#(64) r1 = unpack(signExtend(rf.rd1(s.rs)));
+                    Int#(64) r2 = unpack(signExtend(rf.rd2(s.rt)));
+                    Bit#(64) mult = pack(r1*r2);
+                    hi <= mult[63:32];
+                    lo <= mult[31: 0];
+                endaction
+            tagged MULTU .s:
+                action
+                    UInt#(64) r1 = unpack(signExtend(rf.rd1(s.rs)));
+                    UInt#(64) r2 = unpack(signExtend(rf.rd2(s.rt)));
+                    Bit#(64) mult = pack(r1*r2);
+                    hi <= mult[63:32];
+                    lo <= mult[31: 0];
+                endaction
+            tagged MFHI  .s: execToWB.enq(WbREG{r:s.rd, data:hi});
+            tagged MFLO  .s: execToWB.enq(WbREG{r:s.rd, data:lo});
             tagged BEQ   .s: if(rf.rd1(s.rs)==rf.rd2(s.rt)) jumpTo.enq(pc1 + signExtend(s.of));
             tagged BGEZ  .s: if(signedGE(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
             tagged BGTZ  .s: if(signedGT(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
             tagged BLEZ  .s: if(signedLE(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
             tagged BLTZ  .s: if(signedLT(rf.rd1(s.rs),0))   jumpTo.enq(pc1 + signExtend(s.of));
             tagged BNE   .s: if(rf.rd1(s.rs)!=rf.rd2(s.rt)) jumpTo.enq(pc1 + signExtend(s.of));
-            tagged J     .s: jumpTo.enq(truncate(zextTg(s.tg)));
+            tagged J     .s: jumpTo.enq(truncate(s.tg));
             tagged JAL   .s:
                 action
                     execToWB.enq(WbREG{r:31, data:zeroExtend(pc+2)});
-                    jumpTo.enq(truncate(zextTg(s.tg)));
+                    jumpTo.enq(truncate(s.tg));
                 endaction
             tagged JALR  .s:
                 action
                     execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pc+2)});
-                    jumpTo.enq(truncate(rf.rd1(s.rs)));
+                    jumpTo.enq(truncate(rf.rd1(s.rs)>>2));
                 endaction
-            tagged JR    .s: jumpTo.enq(truncate(rf.rd1(s.rs)));
+            tagged JR    .s: jumpTo.enq(truncate(rf.rd1(s.rs)>>2));
             tagged LB    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbLB{r:s.rt, addr:zeroExtend(addr), line:absaddr[1:0]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbLB{r:s.rt, addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged LBU   .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbLBU{r:s.rt, addr:zeroExtend(addr), line:absaddr[1:0]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbLBU{r:s.rt, addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged LH    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbLH{r:s.rt, addr:zeroExtend(addr), line:absaddr[1]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbLH{r:s.rt, addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged LHU   .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbLHU{r:s.rt, addr:zeroExtend(addr), line:absaddr[1]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbLHU{r:s.rt, addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged LW    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbLW{r:s.rt, addr:zeroExtend(addr)});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbLW{r:s.rt, addr:truncate(addr>>2)});
                 endaction
             tagged SB    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbSB{data:truncate(rf.rd2(s.rt)), addr:zeroExtend(addr), line:absaddr[1:0]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbSB{data:truncate(rf.rd2(s.rt)), addr:truncate(addr>>2), line:addr[1:0]});
                 endaction
             tagged SH    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbSH{data:truncate(rf.rd2(s.rt)), addr:zeroExtend(addr), line:absaddr[1]});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbSH{data:truncate(rf.rd2(s.rt)), addr:truncate(addr>>2), line:addr[1]});
                 endaction
             tagged SW    .s:
                 action
-                    Bit#(32) absaddr = rf.rd1(s.rb)+zeroExtend(s.of);
-                    Bit#(address_width) addr = truncate(absaddr>>2);
-                    execToWB.enq(WbSW{data:rf.rd2(s.rt), addr:zeroExtend(addr)});
+                    Bit#(32) addr = rf.rd1(s.rb)+zeroExtend(s.of);
+                    execToWB.enq(WbSW{data:rf.rd2(s.rt), addr:truncate(addr>>2)});
                 endaction
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
@@ -231,7 +244,7 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
 
     rule wbFromExec(!dataFIFO.notEmpty);
         let wbOp = execToWB.first;
-        function Action reqLoad(Bit#(MaxAddrWidth) addr) = action
+        function Action reqLoad(Bit#(24) addr) = action
             cache.dataCache.request.put(AvalonRequest{command:Read, addr:truncate(addr), data:?});
             pendingLoad.enq(wbOp);
         endaction;
