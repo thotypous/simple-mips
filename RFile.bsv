@@ -17,13 +17,13 @@ module mkRFile(RFile);
     method Bit#(32) rd1(Ridx ridx);
         case (rwout.wget) matches
             tagged Valid {.wr,.d}: return (ridx == 0) ? 0 : (wr==ridx) ? d : rf.sub(ridx);
-		    tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
+            tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
         endcase
     endmethod
     method Bit#(32) rd2(Ridx ridx);
         case (rwout.wget) matches
             tagged Valid {.wr,.d}: return (ridx == 0) ? 0 : (wr==ridx) ? d : rf.sub(ridx);
-		    tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
+            tagged Invalid: return (ridx == 0) ? 0 : rf.sub(ridx);
         endcase
     endmethod
 endmodule
