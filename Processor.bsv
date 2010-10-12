@@ -24,19 +24,20 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
     FIFOF#(Bit#(address_width)) jumpTo <- mkBypassFIFOF;
     Reg#(Bit#(address_width)) pc <- mkReg('h100);
     Reg#(Bit#(11)) cycles <- mkReg(0);
+    Reg#(Bit#(16)) realCycles <- mkReg(0);
     RFile rf <- mkRFile; 
 
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
     mkConnection(masterAdapter.busServer.response, cache.busClient.response);
 
     rule fetchAhead(!jumpTo.notEmpty);
-        trace($format("[Fetch] pc=%h", pc));
+        trace($format("[Fetch %h] pc=%h", realCycles, pc));
         cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
         pc <= pc + 1;
     endrule
 
     rule fetchJump(jumpTo.notEmpty);
-        trace($format("[Fetch] [jump %h] pc=%h", jumpTo.first, pc));
+        trace($format("[Fetch %h] [jump %h] pc=%h", realCycles, jumpTo.first, pc));
         cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
         pc <= jumpTo.first;
         jumpTo.deq;
@@ -44,7 +45,7 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
 
     rule exec;
         Instr instr <- liftM(unpack)(cache.instCache.response.get);
-        trace($format("[Exec] ")+fshow(instr));
+        trace($format("[Exec  %h] ", realCycles)+fshow(instr));
         if(instr matches tagged JAL .s)
             jumpTo.enq('h109);
         if(instr matches tagged JR .s)
@@ -54,6 +55,10 @@ module mkProcessor#(module#(AvalonMaster#(address_width,32)) mkMaster,
 
     rule finish(cycles > 1024);
         $finish;
+    endrule
+
+    rule upcycles;
+        realCycles <= realCycles + 1;
     endrule
 
     return masterAdapter.masterWires;

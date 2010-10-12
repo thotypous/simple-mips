@@ -63,6 +63,7 @@ module mkSingleCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Sing
         let req = pendingReq.first;
         if(req.command == Read)
           begin
+            $display("cache response addr %h real addr %h data %h ignore %h", req.addr, cacheLine.addr, pack(cacheLine.data), pack(ignoreCache(req.addr)));
             if(!ignoreCache(req.addr) && cacheLine.addr == req.addr &&& cacheLine.data matches tagged Valid .data)
               begin
                 dataResponse.enq(data);
@@ -83,6 +84,38 @@ module mkSingleCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Sing
         resetCounter <= 0;
     endmethod
 
+    interface Client busClient;
+        interface Get request;
+            method ActionValue#(AvalonRequest#(address_width,32)) get();
+                let req = pendingReq.first;
+                mainMemReq.deq;
+                if(req.command == Write)
+                    pendingReq.deq;
+                return req;
+            endmethod
+        endinterface
+        interface Put response;
+            method Action put(Bit#(32) data);
+                let req = pendingReq.first;
+                Bit#(cache_width) address = truncate(req.addr);
+                Bool willConflict = False;
+                if(portAaddr.wget matches tagged Valid .x)
+                    willConflict = x == address;
+                if(!willConflict)
+                  begin
+                    let cacheLine = CacheLine{addr: req.addr, data: tagged Valid data};
+                    let bramReq = BRAMRequest{write: True,
+                                              responseOnWrite: False,
+                                              address: address,
+                                              datain: cacheLine};
+                    cacheLines.portB.request.put(bramReq);
+                  end
+                dataResponse.enq(data);
+                pendingReq.deq;
+            endmethod
+        endinterface
+    endinterface
+
     interface Put prefetch;
         method Action put(CacheLine#(address_width) cacheLine) if (!resetState);
             Bit#(cache_width) address = truncate(cacheLine.addr);
@@ -98,24 +131,6 @@ module mkSingleCache#(function Bool ignoreCache(Bit#(address_width) addr)) (Sing
                 cacheLines.portB.request.put(bramReq);
               end
         endmethod
-    endinterface
-
-    interface Client busClient;
-        interface Get request;
-            method ActionValue#(AvalonRequest#(address_width,32)) get();
-                let req = pendingReq.first;
-                mainMemReq.deq;
-                if(req.command == Write)
-                    pendingReq.deq;
-                return req;
-            endmethod
-        endinterface
-        interface Put response;
-            method Action put(Bit#(32) data);
-                dataResponse.enq(data);
-                pendingReq.deq;
-            endmethod
-        endinterface
     endinterface
 
     interface Server thisCache;
