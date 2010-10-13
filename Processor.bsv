@@ -12,6 +12,7 @@ import Cache::*;
 import Instructions::*;
 import Trace::*;
 import RFile::*;
+import Divider::*;
 
 typedef union tagged {
     struct { Ridx     r;    Bit#(32) data;               } WbREG;
@@ -57,6 +58,9 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     Reg#(Bit#(32)) lo <- mkReg(0);
     Reg#(Bit#(32)) hi <- mkReg(0);
 
+    Divider divider <- mkDivider;
+    Reg#(Bool) dividerPending <- mkReg(False);
+
     Reg#(Bool) clearCache <- mkReg(False);
 
     mkConnection(cache.busClient.request, masterAdapter.busServer.request);
@@ -67,6 +71,13 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     rule clearTheCaches(clearCache);
         clearCache <= False;
         cache.clear;
+    endrule
+
+    rule dividerGetResult(dividerPending);
+        match {.r,.q} <- divider.response.get;
+        hi <= r;
+        lo <= q;
+        dividerPending <= False;
     endrule
 
     rule fetchAhead(!jumpTo.notEmpty && !clearCache);
@@ -84,7 +95,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
         jumpTo.deq;
     endrule
 
-    rule exec(!pendingLoad.notEmpty && !clearCache);
+    rule exec(!pendingLoad.notEmpty && !dividerPending && !clearCache);
         Instr inst = unpack(instFIFO.first);
         let pc  = execPC.first;
         let pc1 = pc+1;
@@ -119,22 +130,16 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             tagged SLTI  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),signExtend(s.im))))});
             tagged SLTIU .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<signExtend(s.im)) )});
             tagged SLTU  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<rf.rd2(s.rt)))     });
-            /*tagged DIV   .s: 
+            tagged DIV   .s:
                 action
-                    Int#(32) r1 = unpack(rf.rd1(s.rs));
-                    Int#(32) r2 = unpack(rf.rd2(s.rt));
-                    r2 = r2 == 0 ? 1 : r2;  // make the simulator happy
-                    lo <= pack(r1 / r2);
-                    hi <= pack(r1 % r2);
+                    dividerPending <= True;
+                    divider.request.put(tuple3(rf.rd1(s.rs),rf.rd2(s.rt),True));
                 endaction
             tagged DIVU  .s:
                 action
-                    UInt#(32) r1 = unpack(rf.rd1(s.rs));
-                    UInt#(32) r2 = unpack(rf.rd2(s.rt));
-                    r2 = r2 == 0 ? 1 : r2;  // make the simulator happy
-                    lo <= pack(r1 / r2);
-                    hi <= pack(r1 % r2);
-                endaction*/
+                    dividerPending <= True;
+                    divider.request.put(tuple3(rf.rd1(s.rs),rf.rd2(s.rt),False));
+                endaction
             tagged MULT  .s:
                 action
                     Int#(64) r1 = unpack(signExtend(rf.rd1(s.rs)));
