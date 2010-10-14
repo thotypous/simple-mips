@@ -24,6 +24,7 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width));
     method Action readdata(Bit#(data_width) readdataNew) = noAction;
     method Action waitrequest(Bit#(1) waitrequestNew) = noAction;
     method Action readdatavalid(Bit#(1) readdatavalidNew) = noAction;
+    method Action irq(Bit#(32) irqNew) = noAction;
   endinterface
 
   interface Server busServer;
@@ -36,6 +37,12 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width));
       endmethod
     endinterface
     interface Get response = toGet(delay_stage02);
+  endinterface
+  
+  interface Get irqGet;
+    method ActionValue#(Bit#(32)) get() if (False);
+      return 0;
+    endmethod
   endinterface
 endmodule
 

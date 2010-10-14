@@ -53,11 +53,15 @@ interface AvalonMasterWires#(numeric type address_width, numeric type data_width
 
   (* always_ready, always_enabled, prefix="", result="readdatavalid" *) 
   method Action readdatavalid(Bit#(1) readdatavalid);
+
+  (* always_ready, always_enabled, prefix="", result="irq" *)
+  method Action irq(Bit#(32) irq);
 endinterface
   
 interface AvalonMaster#(numeric type address_width, numeric type data_width);
   interface AvalonMasterWires#(address_width,data_width) masterWires;
   interface Server#(AvalonRequest#(address_width,data_width), Bit#(data_width)) busServer;
+  interface Get#(Bit#(32)) irqGet;
 endinterface
 
 module mkAvalonMaster(AvalonMaster#(address_width,data_width)) provisos (Add#(a__, address_width, TAdd#(address_width, TSub#(TLog#(data_width), 3))));
@@ -65,6 +69,7 @@ module mkAvalonMaster(AvalonMaster#(address_width,data_width)) provisos (Add#(a_
   FIFO#(Bit#(data_width)) respFIFO <- mkBypassFIFO;
 
   RWire#(Bit#(data_width)) readdataIn <- mkRWire;
+  RWire#(Bit#(32)) irqIn <- mkRWire;
   PulseWire readdatavalidIn <- mkPulseWire;
   PulseWire waitrequestIn <- mkPulseWire;
 
@@ -111,11 +116,21 @@ module mkAvalonMaster(AvalonMaster#(address_width,data_width)) provisos (Add#(a_
       if(readdatavalidNew == 1)
         readdatavalidIn.send;
     endmethod
+
+    method Action irq(Bit#(32) irqNew);
+      irqIn.wset(irqNew);
+    endmethod
   endinterface
 
   interface Server busServer;
     interface Put request = toPut(reqFIFO);
     interface Get response = toGet(respFIFO);
+  endinterface
+
+  interface Get irqGet;
+     method ActionValue#(Bit#(32)) get() if (reduceOr(fromMaybe(0,irqIn.wget)) == 1'b1);
+       return fromMaybe(0,irqIn.wget);
+     endmethod
   endinterface
 endmodule
 

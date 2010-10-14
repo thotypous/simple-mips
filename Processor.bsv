@@ -219,7 +219,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             tagged SYSC  .s:
                 case (s.sc)
                     20'h0000: $finish();
-                    20'h0001: $display("[syscall 1] $a0=%h", rf.rd1(4));
+                    20'h0001: $display("[syscall 1] %h", rf.rd1(4));
                     20'h00ff: clearCache <= True;
                 endcase
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
