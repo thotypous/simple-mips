@@ -52,7 +52,7 @@ module mkDivider(Divider);
     Reg#(Bit#(63)) p <- mkRegU;
 
     rule divisionCycle(!done);
-        match {.newq,.newt,.newr,.newp,.newdone} = divisionSteps(2, q,t,r,p);
+        match {.newq,.newt,.newr,.newp,.newdone} = divisionSteps(4, q,t,r,p);
         q <= newq;
         t <= newt;
         r <= newr;
