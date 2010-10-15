@@ -253,9 +253,9 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
                     20'h0001: $display("[syscall 1] %h", rf.rd1(4));
                     20'h0002: clearCache <= True;
                     20'h0003: irqEnabled <= False;
-                    20'h0004: execToWB.enq(WbREG{r:4,  data: irqMask});
-                    20'h0005: execToWB.enq(WbREG{r:31, data: zeroExtend(irqReturnAddr)<<2});
                     20'h0004: irqEnabled <= True;
+                    20'h0005: execToWB.enq(WbREG{r:4,  data: irqMask});
+                    20'h0006: action jumpTo.enq(irqReturnAddr); irqEnabled <= True; endaction
                 endcase
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
