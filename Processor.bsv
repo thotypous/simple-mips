@@ -62,9 +62,8 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     Reg#(Bool) dividerPending <- mkReg(False);
 
     Reg#(Bool) irqEnabled <- mkReg(False);
-    Reg#(Bit#(32)) irqMask <- mkRegU;
+    FIFOF#(Bit#(32)) irqFIFO <- mkUGFIFOF;
     Reg#(Bit#(24)) irqReturnAddr <- mkRegU;
-    RWire#(Bit#(32)) irqIn <- mkRWire;
 
     Reg#(Bool) clearCache <- mkReg(False);
 
@@ -73,10 +72,9 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     mkConnection(cache.instCache.response, toPut(instFIFO));
     mkConnection(cache.dataCache.response, toPut(dataFIFO));
 
-    rule getIrq;
+    rule getIrq(irqEnabled && irqFIFO.notFull);
         let irq <- masterAdapter.irqGet.get;
-        if(irqEnabled)
-            irqIn.wset(irq);
+        irqFIFO.enq(irq);
     endrule
 
     rule clearTheCaches(clearCache);
@@ -92,37 +90,34 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
     endrule
 
     rule fetchAhead(!jumpTo.notEmpty && !clearCache);
-        trace($format("[Fetch %h]", fetchPC));
-        cache.instCache.request.put(AvalonRequest{command: Read, addr: fetchPC, data: ?});
-        execPC.enq(fetchPC);
-        if(irqIn.wget matches tagged Valid .irq)
+        let pc = fetchPC;
+        if(irqEnabled && irqFIFO.notEmpty)
           begin
-            fetchPC <= 'h080;
-            irqReturnAddr <= fetchPC + 1;
-            irqMask <= irq;
+            trace($format("[IRQ] irqReturnAddr=%h", fetchPC));
+            irqReturnAddr <= fetchPC;
             irqEnabled <= False;
+            pc = 'h080;
           end
-        else
-          begin
-            fetchPC <= fetchPC + 1;
-          end
+        fetchPC <= pc + 1;
+        trace($format("[Fetch %h]", pc));
+        cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
+        execPC.enq(pc);
     endrule
 
     rule fetchJump(jumpTo.notEmpty && !clearCache);
-        trace($format("[Fetch %h] [jump %h]", fetchPC, jumpTo.first));
-        cache.instCache.request.put(AvalonRequest{command: Read, addr: fetchPC, data: ?});
-        execPC.enq(fetchPC);
-        if(irqIn.wget matches tagged Valid .irq)
+        let pc = fetchPC;
+        let newpc = jumpTo.first;
+        if(irqEnabled && irqFIFO.notEmpty)
           begin
-            fetchPC <= 'h080;
-            irqReturnAddr <= jumpTo.first;
-            irqMask <= irq;
+            trace($format("[IRQ] [@BDS] irqReturnAddr=%h", newpc));
+            irqReturnAddr <= newpc;
             irqEnabled <= False;
+            newpc = 'h080;
           end
-        else
-          begin
-            fetchPC <= jumpTo.first;
-          end
+        fetchPC <= newpc;
+        trace($format("[Fetch %h] [jump %h]", pc, newpc));
+        cache.instCache.request.put(AvalonRequest{command: Read, addr: pc, data: ?});
+        execPC.enq(pc);
         jumpTo.deq;
     endrule
 
@@ -250,12 +245,12 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             tagged SYSC  .s:
                 case (s.sc)
                     20'h0000: $finish();
-                    20'h0001: $display("[syscall 1] %h", rf.rd1(4));
+                    20'h0001: $display("[Display] %h", rf.rd1(4));
                     20'h0002: clearCache <= True;
                     20'h0003: irqEnabled <= False;
                     20'h0004: irqEnabled <= True;
-                    20'h0005: execToWB.enq(WbREG{r:4,  data: irqMask});
-                    20'h0006: action jumpTo.enq(irqReturnAddr); irqEnabled <= True; endaction
+                    20'h0005: execToWB.enq(WbREG{r:4, data:(irqFIFO.notEmpty ? irqFIFO.first : 0)});
+                    20'h0006: if(irqFIFO.notEmpty) begin jumpTo.enq(irqReturnAddr); irqFIFO.deq; irqEnabled <= True; end
                 endcase
             tagged ILLEGAL : $display("Exec error: Invalid instruction %h at pc=%h", pack(inst), pc);
         endcase
