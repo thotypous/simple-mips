@@ -1,6 +1,5 @@
 import RegFile::*;
 import Instructions::*;
-import Trace::*;
 
 interface RFile;
     method Action wr(Ridx ridx, Bit#(32) data);
@@ -12,7 +11,6 @@ module mkRFile(RFile);
     RegFile#(Ridx,Bit#(32)) rf <- mkRegFileWCF(0,31);
     RWire#(Tuple2#(Ridx,Bit#(32))) rwout <- mkRWire;
     method Action wr(Ridx ridx, Bit#(32) data);
-        trace($format("[RFile] r%0d <= 0x%h", ridx, data));
         rf.upd(ridx, data);
         rwout.wset(tuple2(ridx, data));
     endmethod
