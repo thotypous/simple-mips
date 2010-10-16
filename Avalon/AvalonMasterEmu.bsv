@@ -13,13 +13,15 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width));
   FIFO#(Bit#(data_width)) delay_stage01 <- mkFIFO;
   FIFO#(Bit#(data_width)) delay_stage02 <- mkFIFO;
 
-  Reg#(Bit#(12)) cycle <- mkReg(0);
+  Reg#(Bit#(12)) irqEmuCycle <- mkReg(0);
 
   mkConnection(bram.portA.response,  toPut(delay_stage01));
   mkConnection(toGet(delay_stage01), toPut(delay_stage02));
 
   rule incCycle;
-      cycle <= cycle + 1;
+      let irqEmu <- $test$plusargs("irqemu");
+      if(irqEmu)
+          irqEmuCycle <= irqEmuCycle + 1;
   endrule
 
   interface AvalonMasterWires masterWires;
@@ -46,9 +48,9 @@ module mkAvalonMasterEmu(AvalonMaster#(address_width,data_width));
   endinterface
   
   interface Get irqGet;
-    method ActionValue#(Bit#(32)) get() if (cycle == 4095);
+    method ActionValue#(Bit#(32)) get() if (irqEmuCycle == 4095);
       $display("[Emu] Simulating IRQ");
-      return 32'hf33dc0f3;
+      return 32'h01010101;
     endmethod
   endinterface
 endmodule
