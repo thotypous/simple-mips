@@ -7,13 +7,13 @@ import AvalonMasterEmu::*;
 import Processor::*;
 
 module mkMIPS(AvalonMasterWires#(24,32));
-    function ignoreCache(Bit#(24) addr) = addr[23] == 1'b1;
-    let mips <- mkProcessor(mkAvalonMaster, ignoreCache);
+    function ignoreCache(Bit#(24) addr) = addr[23:22] == 2'b11;
+    let mips <- mkProcessor(mkAvalonMaster, ignoreCache, 'h2000000, 'h80);
     return mips;
 endmodule
 
 module mkMIPSEmu();
     function ignoreCache(Bit#(24) addr) = False;
-    AvalonMasterWires#(24,32) mips <- mkProcessor(mkAvalonMasterEmu, ignoreCache);
+    AvalonMasterWires#(24,32) mips <- mkProcessor(mkAvalonMasterEmu, ignoreCache, 'h100, 'h80);
 endmodule
 

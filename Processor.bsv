@@ -42,11 +42,15 @@ instance FShow#(WBOp);
     endfunction
 endinstance
 
-module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignoreCache(Bit#(24) addr)) (AvalonMasterWires#(24,32));
+module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster,
+                    function Bool ignoreCache(Bit#(24) addr),
+                    Bit#(24) resetAddr, Bit#(24) irqAddr)
+                   (AvalonMasterWires#(24,32));
+
     AvalonMaster#(24,32) masterAdapter <- mkMaster;
     Cache#(24,12,12) cache <- mkCache(ignoreCache);
 
-    Reg  #(Bit#(24)) fetchPC <- mkReg('h100);
+    Reg  #(Bit#(24)) fetchPC <- mkReg(resetAddr);
     FIFOF#(Bit#(24)) jumpTo <- mkBypassFIFOF;
     FIFOF#(Bit#(24)) execPC <- mkPipelineFIFOF;
     FIFOF#(Bit#(32)) instFIFO <- mkBypassFIFOF;
@@ -96,7 +100,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             trace($format("[IRQ] irqReturnAddr=%h", fetchPC));
             irqReturnAddr <= fetchPC;
             irqEnabled <= False;
-            pc = 'h080;
+            pc = irqAddr;
           end
         fetchPC <= pc + 1;
         trace($format("[Fetch %h]", pc));
@@ -112,7 +116,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster, function Bool ignore
             trace($format("[IRQ] [@BDS] irqReturnAddr=%h", newpc));
             irqReturnAddr <= newpc;
             irqEnabled <= False;
-            newpc = 'h080;
+            newpc = irqAddr;
           end
         fetchPC <= newpc;
         trace($format("[Fetch %h] [jump %h]", pc, newpc));
