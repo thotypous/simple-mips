@@ -8,7 +8,7 @@ import Processor::*;
 
 module mkMIPS(AvalonMasterWires#(24,32));
     function ignoreCache(Bit#(24) addr) = addr[23:22] == 2'b11;
-    let mips <- mkProcessor(mkAvalonMaster, ignoreCache, 'h2000000, 'h80);
+    let mips <- mkProcessor(mkAvalonMaster, ignoreCache, 'h800000, 'h80);
     return mips;
 endmodule
 
