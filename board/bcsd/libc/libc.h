@@ -24,6 +24,7 @@ void exit(int status);
 typedef unsigned int size_t;
 typedef int ptrdiff_t;
 
+void *sbrk(int increment);
 void *malloc(size_t size);
 void free(void *ptr);
 
