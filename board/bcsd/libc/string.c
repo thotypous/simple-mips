@@ -29,11 +29,11 @@ void *memmove(void *dest, const void *src, size_t n) {
         srcp += n;
         dstp += n;
         while(n--)
-	        *--dstp = *--srcp;
+            *--dstp = *--srcp;
     }
     else {
         while(n--)
-	        *dstp++ = *srcp++;
+            *dstp++ = *srcp++;
     }
     return dest;
 }
