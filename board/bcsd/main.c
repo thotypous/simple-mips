@@ -1,6 +1,6 @@
 #include <libc.h>
-#include "drivers/lcd.h"
-#include "drivers/keyboard.h"
+#include <drivers/lcd.h>
+#include <drivers/keyboard.h>
 
 void irqhandler(unsigned int mask) {
     if(mask & 0x01)
@@ -12,10 +12,6 @@ void keyb_callback(int ascii, int code, int isextended) {
         emulate_sigint();
     else
         console_keyb(ascii, code, isextended);
-}
-
-void console_cmd_callback(char *cmd) {
-    console_write(cmd, 1);
 }
 
 int main() {

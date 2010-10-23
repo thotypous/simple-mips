@@ -1,12 +1,12 @@
-#include "system.h"
-#include "keyboard.h"
-#include "lcd.h"
-#include "led.h"
+#include <drivers/system.h>
+#include <drivers/keyboard.h>
+#include <drivers/lcd.h>
 
 static volatile int * const dev_lcd = (int *)DEVADDR_LCD;
 
 static char console_out_circbuf[512][16] = {{0}};
 static int console_out_circbuf_pos = 0;
+static int console_out_circbuf_char = 0;
 static int console_out_circbuf_disp = 0;
 
 static char console_in_buf[5120] = {0};
@@ -138,9 +138,9 @@ static void console_delete_char(int pos) {
     console_render_in_buf();
 }
 
-void console_write(char *text, int breakline) {
-    int j, i = console_out_circbuf_pos;
-    for(j = 0; j < 16 && console_out_circbuf[i][j]; j++);
+void console_write(char *text) {
+    int j = console_out_circbuf_char;
+    int i = console_out_circbuf_pos;
     while(1) {
         if((j == 16) || (*text == '\n')) {
             i = (i + 1) & 0x1ff;
@@ -154,9 +154,8 @@ void console_write(char *text, int breakline) {
             break;
         text++;
     }
+    console_out_circbuf_char = j;
     console_out_circbuf_disp = i;
-    if(breakline)
-        i = (i + 1) & 0x1ff;
     console_out_circbuf_pos = i;
     console_render_out_circbuf();
 }

@@ -1,5 +1,5 @@
-#include "system.h"
-#include "keyboard.h"
+#include <drivers/system.h>
+#include <drivers/keyboard.h>
 
 static volatile unsigned int * const dev_keyb = (unsigned int *)DEVADDR_PS2_KEYB;
 #define keyb_read_data()       (dev_keyb[0])
