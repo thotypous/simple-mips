@@ -215,6 +215,7 @@ void console_keyb(int ascii, int code, int isextended) {
         console_render_in_buf();
     }
     else if( isextended && code == 0x69) {
+        /* end */
         int i;
         for(i = 0; i < 5119 && console_in_buf[i]; i++);
         if(i < 8) {
