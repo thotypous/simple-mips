@@ -13,6 +13,9 @@ static char console_in_buf[5120] = {0};
 static int console_in_buf_disp = 0;
 static int lcd_cursor_pos = 0;
 
+static volatile int console_readline_waiting = 0;
+static char console_line[5120] = {0};
+
 static void delay() {
     int i;
     for(i = 0; i < 10000; i++)
@@ -139,24 +142,22 @@ static void console_delete_char(int pos) {
 }
 
 void console_write(char *text) {
-    int j = console_out_circbuf_char;
-    int i = console_out_circbuf_pos;
-    while(1) {
-        if((j == 16) || (*text == '\n')) {
-            i = (i + 1) & 0x1ff;
-            j = 0;
+    int x = console_out_circbuf_char;
+    int y = console_out_circbuf_pos;
+    while(*text) {
+        if((x > 15) || (*text == '\n')) {
+            y = (y + 1) & 0xff;
+            x = 0;
         }
         if(*text != '\n') {
-            console_out_circbuf[i][j] = *text;
-            j++;
+            console_out_circbuf[y][x] = *text;
+            x++;
         }
-        if(*text == 0)
-            break;
         text++;
     }
-    console_out_circbuf_char = j;
-    console_out_circbuf_disp = i;
-    console_out_circbuf_pos = i;
+    console_out_circbuf_char = x;
+    console_out_circbuf_pos  = y;
+    console_out_circbuf_disp = y;
     console_render_out_circbuf();
 }
 
@@ -227,14 +228,28 @@ void console_keyb(int ascii, int code, int isextended) {
         }
         console_render_in_buf();
     }
-    else if(code == 0x5A) {
-        /* enter */
-        console_in_buf[5119] = 0;
-        console_cmd_callback(console_in_buf);
+    else if(code == 0x5A && console_readline_waiting) {
+        /* enter (ignore if line is not expected) */
+        int i;
+        /* copy buffer */
+        console_in_buf[5118] = 0;
+        for(i = 0; console_in_buf[i]; i++)
+            console_line[i] = console_in_buf[i];
+        console_line[i++] = '\n';
+        console_line[i  ] = 0;
+        /* clear line */
         console_in_buf_disp = 0;
         lcd_cursor_pos = 0;
         console_in_buf[0] = 0;
         console_render_in_buf();
+        /* unset flag */
+        console_readline_waiting = 0;
     }
+}
+
+char *console_readline() {
+    console_readline_waiting = 1;
+    while(console_readline_waiting); /* busy loop */
+    return console_line;
 }
 

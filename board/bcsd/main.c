@@ -18,6 +18,10 @@ int main() {
     lcd_init();
     keyb_init();
     asm("syscall 0x4"); /* IRQ enable */
-    while(1);
+
+    while(1) {
+        char *line = console_readline();
+        console_write(line);
+    }
     return 0;
 }
