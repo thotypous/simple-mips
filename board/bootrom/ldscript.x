@@ -1,4 +1,4 @@
-/* Simple ld script for the MIPS emulator */
+/* Simple ld script for the MIPSboard bootloader */
 
 /* Based on
  * ld.script for compressed kernel support of MIPS
