@@ -5,6 +5,12 @@
 
 #define NULL ((void *)0)
 
+#define INT_MAX 0x7fffffff
+
+extern int errno;
+#define ENOMEM 12
+#define EINTR  4
+
 #define SIGINT 2
 typedef void (*sighandler_t)(int);
 sighandler_t signal(int signum, sighandler_t handler);
@@ -16,12 +22,14 @@ void __assert_func(const char *file, int line, const char *msg);
 void exit(int status);
 
 typedef unsigned int size_t;
+typedef int ptrdiff_t;
 
 void *malloc(size_t size);
 void free(void *ptr);
 
 void *memset(void *s, int c, size_t n);
 void *memcpy(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n);
 size_t strlen(const char *s);
 char *strcpy(char *dest, const char *src);
 char *strcat(char *dest, const char *src);

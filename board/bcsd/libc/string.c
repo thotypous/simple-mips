@@ -22,6 +22,22 @@ void *memcpy(void *dest, const void *src, size_t n) {
     return dest;
 }
 
+void *memmove(void *dest, const void *src, size_t n) {
+    unsigned char *dstp = (unsigned char *)dest;
+    const unsigned char *srcp = (const unsigned char *)src;
+    if(srcp < dstp && dstp < srcp + n) {
+        srcp += n;
+        dstp += n;
+        while(n--)
+	        *--dstp = *--srcp;
+    }
+    else {
+        while(n--)
+	        *dstp++ = *srcp++;
+    }
+    return dest;
+}
+
 size_t strlen(const char *s) {
     size_t len = 0;
     while(*s) {
