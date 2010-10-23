@@ -157,7 +157,7 @@ void console_write(char *text) {
     }
     console_out_circbuf_char = x;
     console_out_circbuf_pos  = y;
-    console_out_circbuf_disp = y;
+    console_out_circbuf_disp = (x == 0) ? (y-1) : y;
     console_render_out_circbuf();
 }
 
