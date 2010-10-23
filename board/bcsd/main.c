@@ -1,5 +1,5 @@
 #include <libc.h>
-#include <drivers/lcd.h>
+#include <drivers/console.h>
 #include <drivers/keyboard.h>
 
 void irqhandler(unsigned int mask) {

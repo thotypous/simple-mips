@@ -1,6 +1,6 @@
 #include <drivers/system.h>
 #include <drivers/keyboard.h>
-#include <drivers/lcd.h>
+#include <drivers/console.h>
 
 static volatile int * const dev_lcd = (int *)DEVADDR_LCD;
 
