@@ -25,6 +25,7 @@ typedef unsigned int size_t;
 typedef int ptrdiff_t;
 
 void *sbrk(int increment);
+
 void *malloc(size_t size);
 void free(void *ptr);
 
@@ -38,6 +39,7 @@ int strcmp(const char *s1, const char *s2);
 
 int putchar(int c);
 int getchar(void);
+
 int printf(const char *format, ...);
 int vprintf(const char *format, va_list ap);
 int sprintf(char *str, const char *format, ...);
