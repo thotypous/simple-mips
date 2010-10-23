@@ -8,6 +8,7 @@
 #define SIGINT 2
 typedef void (*sighandler_t)(int);
 sighandler_t signal(int signum, sighandler_t handler);
+void emulate_sigint(void);
 
 #define assert(__e) ((__e) ? (void)0 : __assert_func (__FILE__, __LINE__, #__e))
 
@@ -21,7 +22,6 @@ void free(void *ptr);
 
 void *memset(void *s, int c, size_t n);
 void *memcpy(void *dest, const void *src, size_t n);
-
 size_t strlen(const char *s);
 char *strcpy(char *dest, const char *src);
 char *strcat(char *dest, const char *src);

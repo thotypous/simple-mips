@@ -1,3 +1,4 @@
+#include <libc.h>
 #include "drivers/lcd.h"
 #include "drivers/keyboard.h"
 
@@ -6,12 +7,9 @@ void irqhandler(unsigned int mask) {
         keyb_irqhandler();
 }
 
-void sigint() {
-}
-
 void keyb_callback(int ascii, int code, int isextended) {
     if(ascii == 'c' && (keyb_modifiers & KEYB_CTRL))
-        sigint();
+        emulate_sigint();
     else
         console_keyb(ascii, code, isextended);
 }
