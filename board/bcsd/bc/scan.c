@@ -10,6 +10,8 @@
 
 #include <libc.h>
 
+#define EOF -1
+
 /* cfront 1.2 defines "c_plusplus" instead of "__cplusplus" */
 #ifdef c_plusplus
 #ifndef __cplusplus
@@ -86,7 +88,7 @@
 #define YY_STATE_EOF(state) (YY_END_OF_BUFFER + state + 1)
 
 /* Special action meaning "start processing a new file". */
-#define YY_NEW_FILE yyrestart( yyin )
+#define YY_NEW_FILE yyrestart( )
 
 #define YY_END_OF_BUFFER_CHAR 0
 
@@ -96,7 +98,6 @@
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 extern int yyleng;
-extern FILE *yyin, *yyout;
 
 #define EOB_ACT_CONTINUE_SCAN 0
 #define EOB_ACT_END_OF_FILE 1
@@ -140,8 +141,6 @@ typedef unsigned int yy_size_t;
 
 struct yy_buffer_state
         {
-        FILE *yy_input_file;
-
         char *yy_ch_buf;                /* input buffer */
         char *yy_buf_pos;               /* current position in input buffer */
 
@@ -222,13 +221,13 @@ static int yy_start = 0;        /* start state number */
  */
 static int yy_did_buffer_switch_on_eof;
 
-void yyrestart YY_PROTO(( FILE *input_file ));
+void yyrestart YY_PROTO(( void ));
 
 void yy_switch_to_buffer YY_PROTO(( YY_BUFFER_STATE new_buffer ));
 void yy_load_buffer_state YY_PROTO(( void ));
-YY_BUFFER_STATE yy_create_buffer YY_PROTO(( FILE *file, int size ));
+YY_BUFFER_STATE yy_create_buffer YY_PROTO(( int size ));
 void yy_delete_buffer YY_PROTO(( YY_BUFFER_STATE b ));
-void yy_init_buffer YY_PROTO(( YY_BUFFER_STATE b, FILE *file ));
+void yy_init_buffer YY_PROTO(( YY_BUFFER_STATE b ));
 void yy_flush_buffer YY_PROTO(( YY_BUFFER_STATE b ));
 #define YY_FLUSH_BUFFER yy_flush_buffer( yy_current_buffer )
 
@@ -245,21 +244,20 @@ static void yy_flex_free YY_PROTO(( void * ));
 #define yy_set_interactive(is_interactive) \
         { \
         if ( ! yy_current_buffer ) \
-                yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE ); \
+                yy_current_buffer = yy_create_buffer( YY_BUF_SIZE ); \
         yy_current_buffer->yy_is_interactive = is_interactive; \
         }
 
 #define yy_set_bol(at_bol) \
         { \
         if ( ! yy_current_buffer ) \
-                yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE ); \
+                yy_current_buffer = yy_create_buffer( YY_BUF_SIZE ); \
         yy_current_buffer->yy_at_bol = at_bol; \
         }
 
 #define YY_AT_BOL() (yy_current_buffer->yy_at_bol)
 
 typedef unsigned char YY_CHAR;
-FILE *yyin = (FILE *) 0, *yyout = (FILE *) 0;
 typedef int yy_state_type;
 extern char *yytext;
 #define yytext_ptr yytext
@@ -581,9 +579,7 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "scan.l"
 #define INITIAL 0
-#line 2 "scan.l"
 /* scan.l: the (f)lex description file for the scanner. */
 
 /*  This file is part of GNU bc.
@@ -635,159 +631,6 @@ char *yytext;
 #undef yywrap
 _PROTOTYPE(int yywrap, (void));
 
-#if defined(LIBEDIT)
-/* Support for the BSD libedit with history for
-   nicer input on the interactive part of input. */
-
-#include <histedit.h>
-
-/* Have input call the following function. */
-#undef  YY_INPUT
-#define YY_INPUT(buf,result,max_size) \
-                bcel_input((char *)buf, &result, max_size)
-
-/* Variables to help interface editline with bc. */
-static const char *bcel_line = (char *)NULL;
-static int   bcel_len = 0;
-
-
-/* Required to get rid of that ugly ? default prompt! */
-char *
-null_prompt (EditLine *el)
-{
-  return "";
-}
-
-
-/* bcel_input puts upto MAX characters into BUF with the number put in
-   BUF placed in *RESULT.  If the yy input file is the same as
-   stdin, use editline.  Otherwise, just read it.
-*/
-
-static void
-bcel_input (buf, result, max)
-        char *buf;
-        int  *result;
-        int   max;
-{
-  if (!edit || yyin != stdin)
-    {
-      while ( (*result = read( fileno(yyin), buf, max )) < 0 )
-        if (errno != EINTR)
-          {
-            yyerror( "read() in flex scanner failed" );
-            exit (1);
-          }
-      return;
-    }
-
-  /* Do we need a new string? */
-  if (bcel_len == 0)
-    {
-      bcel_line = el_gets(edit, &bcel_len);
-      if (bcel_line == NULL) {
-        /* end of file */
-        *result = 0;
-        bcel_len = 0;
-        return;
-      }
-      if (bcel_len != 0)
-        history (hist, &histev, H_ENTER, bcel_line); 
-      fflush (stdout);
-    }
-
-  if (bcel_len <= max)
-    {
-      strncpy (buf, bcel_line, bcel_len);
-      *result = bcel_len;
-      bcel_len = 0;
-    }
-  else
-    {
-      strncpy (buf, bcel_line, max);
-      *result = max;
-      bcel_line += max;
-      bcel_len -= max;
-    }
-}
-#endif
-
-#ifdef READLINE
-/* Support for the readline and history libraries.  This allows
-   nicer input on the interactive part of input. */
-
-/* Have input call the following function. */
-#undef  YY_INPUT
-#define YY_INPUT(buf,result,max_size) \
-                rl_input((char *)buf, &result, max_size)
-
-/* Variables to help interface readline with bc. */
-static char *rl_line = (char *)NULL;
-static char *rl_start = (char *)NULL;
-static int   rl_len = 0;
-
-/* Definitions for readline access. */
-extern FILE *rl_instream;
-_PROTOTYPE(char *readline, (char *));
-
-/* rl_input puts upto MAX characters into BUF with the number put in
-   BUF placed in *RESULT.  If the yy input file is the same as
-   rl_instream (stdin), use readline.  Otherwise, just read it.
-*/
-
-static void
-rl_input (buf, result, max)
-        char *buf;
-        int  *result;
-        int   max;
-{
-  if (yyin != rl_instream)
-    {
-      while ( (*result = read( fileno(yyin), buf, max )) < 0 )
-        if (errno != EINTR)
-          {
-            yyerror( "read() in flex scanner failed" );
-            exit (1);
-          }
-      return;
-    }
-
-  /* Do we need a new string? */
-  if (rl_len == 0)
-    {
-      if (rl_start)
-        free(rl_start);
-      rl_start = readline ("");
-      if (rl_start == NULL) {
-        /* end of file */
-        *result = 0;
-        rl_len = 0;
-        return;
-      }
-      rl_line = rl_start;
-      rl_len = strlen (rl_line)+1;
-      if (rl_len != 1)
-        add_history (rl_line); 
-      rl_line[rl_len-1] = '\n';
-      fflush (stdout);
-    }
-
-  if (rl_len <= max)
-    {
-      strncpy (buf, rl_line, rl_len);
-      *result = rl_len;
-      rl_len = 0;
-    }
-  else
-    {
-      strncpy (buf, rl_line, max);
-      *result = max;
-      rl_line += max;
-      rl_len -= max;
-    }
-}
-#endif
-
 #if !defined(READLINE) && !defined(LIBEDIT)
 
 /* MINIX returns from read with < 0 if SIGINT is  encountered.
@@ -802,7 +645,6 @@ rl_input (buf, result, max)
 
 #define slcomment 1
 
-#line 809 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -885,28 +727,6 @@ YY_MALLOC_DECL
 #define ECHO (void) fwrite( yytext, yyleng, 1, yyout )
 #endif
 
-/* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
- * is returned in "result".
- */
-#ifndef YY_INPUT
-#define YY_INPUT(buf,result,max_size) \
-        if ( yy_current_buffer->yy_is_interactive ) \
-                { \
-                int c = '*', n; \
-                for ( n = 0; n < max_size && \
-                             (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
-                        buf[n] = (char) c; \
-                if ( c == '\n' ) \
-                        buf[n++] = (char) c; \
-                if ( c == EOF && ferror( yyin ) ) \
-                        YY_FATAL_ERROR( "input in flex scanner failed" ); \
-                result = n; \
-                } \
-        else if ( ((result = fread( buf, 1, max_size, yyin )) == 0) \
-                  && ferror( yyin ) ) \
-                YY_FATAL_ERROR( "input in flex scanner failed" );
-#endif
-
 /* No semi-colon after return; correct usage is to write "yyterminate();" -
  * we don't want an extra ';' after the "return" because that will cause
  * some compilers to complain about unreachable statements.
@@ -953,10 +773,6 @@ YY_DECL
         register char *yy_cp, *yy_bp;
         register int yy_act;
 
-#line 222 "scan.l"
-
-#line 962 "lex.yy.c"
-
         if ( yy_init )
                 {
                 yy_init = 0;
@@ -968,15 +784,9 @@ YY_DECL
                 if ( ! yy_start )
                         yy_start = 1;   /* first start state */
 
-                if ( ! yyin )
-                        yyin = stdin;
-
-                if ( ! yyout )
-                        yyout = stdout;
-
                 if ( ! yy_current_buffer )
                         yy_current_buffer =
-                                yy_create_buffer( yyin, YY_BUF_SIZE );
+                                yy_create_buffer( YY_BUF_SIZE );
 
                 yy_load_buffer_state();
                 }
@@ -1040,7 +850,6 @@ do_action:      /* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 223 "scan.l"
 {
                   if (!std_only)
                     BEGIN(slcomment);
@@ -1050,102 +859,82 @@ YY_RULE_SETUP
         YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 229 "scan.l"
 { BEGIN(INITIAL); }
         YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 230 "scan.l"
 { line_no++; BEGIN(INITIAL); return(ENDOFLINE); }
         YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 231 "scan.l"
 return(Define);
         YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 232 "scan.l"
 return(Break);
         YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 233 "scan.l"
 return(Quit);
         YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 234 "scan.l"
 return(Length);
         YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 235 "scan.l"
 return(Return);
         YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 236 "scan.l"
 return(For);
         YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 237 "scan.l"
 return(If);
         YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 238 "scan.l"
 return(While);
         YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 239 "scan.l"
 return(Sqrt);
         YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 240 "scan.l"
 return(Scale);
         YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 241 "scan.l"
 return(Ibase);
         YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 242 "scan.l"
 return(Obase);
         YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 243 "scan.l"
 return(Auto);
         YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 244 "scan.l"
 return(Else);
         YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 245 "scan.l"
 return(Read);
         YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 246 "scan.l"
 return(Halt);
         YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 247 "scan.l"
 return(Last);
         YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 248 "scan.l"
 {
 #if defined(READLINE) || defined(LIBEDIT)
           return(HistoryVar);
@@ -1156,27 +945,22 @@ YY_RULE_SETUP
         YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 256 "scan.l"
 return(Warranty);
         YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 257 "scan.l"
 return(Continue);
         YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 258 "scan.l"
 return(Print);
         YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 259 "scan.l"
 return(Limits);
         YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 260 "scan.l"
 {
 #ifdef DOT_IS_LAST
        return(Last);
@@ -1187,38 +971,31 @@ YY_RULE_SETUP
         YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 267 "scan.l"
 { yylval.c_value = yytext[0]; 
                                               return((int)yytext[0]); }
         YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 269 "scan.l"
 { return(AND); }
         YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 270 "scan.l"
 { return(OR); }
         YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 271 "scan.l"
 { return(NOT); }
         YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 272 "scan.l"
 { yylval.c_value = yytext[0]; return((int)yytext[0]); }
         YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 273 "scan.l"
 { yylval.c_value = yytext[0]; return(ASSIGN_OP); }
         YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 274 "scan.l"
 { 
 #ifdef OLD_EQ_OP
                          char warn_save;
@@ -1236,32 +1013,26 @@ YY_RULE_SETUP
         YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 288 "scan.l"
 { yylval.s_value = strcopyof(yytext); return(REL_OP); }
         YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 289 "scan.l"
 { yylval.c_value = yytext[0]; return(INCR_DECR); }
         YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 290 "scan.l"
 { line_no++; return(ENDOFLINE); }
         YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 291 "scan.l"
 {  line_no++;  /* ignore a "quoted" newline */ }
         YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 292 "scan.l"
 { /* ignore spaces and tabs */ }
         YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 293 "scan.l"
 {
         int c;
 
@@ -1278,7 +1049,7 @@ YY_RULE_SETUP
               }
             if (c == EOF)
               {
-                fprintf (stderr,"EOF encountered in a comment.\n");
+                printf ("EOF encountered in a comment.\n");
                 break;
               }
           }
@@ -1286,12 +1057,10 @@ YY_RULE_SETUP
         YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 314 "scan.l"
 { yylval.s_value = strcopyof(yytext); return(NAME); }
         YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 315 "scan.l"
 {
               unsigned char *look;
               int count = 0;
@@ -1307,7 +1076,6 @@ YY_RULE_SETUP
         YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 327 "scan.l"
 {
               unsigned char *src, *dst;
               int len;
@@ -1338,7 +1106,6 @@ YY_RULE_SETUP
         YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 354 "scan.l"
 {
           if (yytext[0] < ' ')
             yyerror ("illegal character: ^%c",yytext[0] + '@');
@@ -1351,10 +1118,8 @@ YY_RULE_SETUP
         YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 363 "scan.l"
 ECHO;
         YY_BREAK
-#line 1361 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(slcomment):
         yyterminate();
@@ -1380,7 +1145,6 @@ case YY_STATE_EOF(slcomment):
                          * back-up) that will match for the new input source.
                          */
                         yy_n_chars = yy_current_buffer->yy_n_chars;
-                        yy_current_buffer->yy_input_file = yyin;
                         yy_current_buffer->yy_buffer_status = YY_BUFFER_NORMAL;
                         }
 
@@ -1603,7 +1367,7 @@ static int yy_get_next_buffer()
                 if ( number_to_move == YY_MORE_ADJ )
                         {
                         ret_val = EOB_ACT_END_OF_FILE;
-                        yyrestart( yyin );
+                        yyrestart( );
                         }
 
                 else
@@ -1776,7 +1540,7 @@ static int input()
                                          */
 
                                         /* Reset buffer status. */
-                                        yyrestart( yyin );
+                                        yyrestart( );
 
                                         /* fall through */
 
@@ -1810,17 +1574,12 @@ static int input()
         }
 
 
-#ifdef YY_USE_PROTOS
-void yyrestart( FILE *input_file )
-#else
-void yyrestart( input_file )
-FILE *input_file;
-#endif
+void yyrestart( void )
         {
         if ( ! yy_current_buffer )
-                yy_current_buffer = yy_create_buffer( yyin, YY_BUF_SIZE );
+                yy_current_buffer = yy_create_buffer( YY_BUF_SIZE );
 
-        yy_init_buffer( yy_current_buffer, input_file );
+        yy_init_buffer( yy_current_buffer );
         yy_load_buffer_state();
         }
 
@@ -1863,16 +1622,14 @@ void yy_load_buffer_state()
         {
         yy_n_chars = yy_current_buffer->yy_n_chars;
         yytext_ptr = yy_c_buf_p = yy_current_buffer->yy_buf_pos;
-        yyin = yy_current_buffer->yy_input_file;
         yy_hold_char = *yy_c_buf_p;
         }
 
 
 #ifdef YY_USE_PROTOS
-YY_BUFFER_STATE yy_create_buffer( FILE *file, int size )
+YY_BUFFER_STATE yy_create_buffer( int size )
 #else
-YY_BUFFER_STATE yy_create_buffer( file, size )
-FILE *file;
+YY_BUFFER_STATE yy_create_buffer( size )
 int size;
 #endif
         {
@@ -1893,7 +1650,7 @@ int size;
 
         b->yy_is_our_buffer = 1;
 
-        yy_init_buffer( b, file );
+        yy_init_buffer( b );
 
         return b;
         }
@@ -1919,36 +1676,20 @@ YY_BUFFER_STATE b;
         }
 
 
-#ifndef YY_ALWAYS_INTERACTIVE
-#ifndef YY_NEVER_INTERACTIVE
-extern int isatty YY_PROTO(( int ));
-#endif
-#endif
-
 #ifdef YY_USE_PROTOS
-void yy_init_buffer( YY_BUFFER_STATE b, FILE *file )
+void yy_init_buffer( YY_BUFFER_STATE b )
 #else
-void yy_init_buffer( b, file )
+void yy_init_buffer( b )
 YY_BUFFER_STATE b;
-FILE *file;
 #endif
 
 
         {
         yy_flush_buffer( b );
 
-        b->yy_input_file = file;
         b->yy_fill_buffer = 1;
 
-#if YY_ALWAYS_INTERACTIVE
         b->yy_is_interactive = 1;
-#else
-#if YY_NEVER_INTERACTIVE
-        b->yy_is_interactive = 0;
-#else
-        b->yy_is_interactive = file ? (isatty( fileno(file) ) > 0) : 0;
-#endif
-#endif
         }
 
 
@@ -2006,7 +1747,6 @@ yy_size_t size;
         b->yy_buf_size = size - 2;      /* "- 2" to take care of EOB's */
         b->yy_buf_pos = b->yy_ch_buf = base;
         b->yy_is_our_buffer = 0;
-        b->yy_input_file = 0;
         b->yy_n_chars = b->yy_buf_size;
         b->yy_is_interactive = 0;
         b->yy_at_bol = 1;
@@ -2139,7 +1879,7 @@ static void yy_fatal_error( msg )
 char msg[];
 #endif
         {
-        (void) fprintf( stderr, "%s\n", msg );
+        (void) printf( "%s\n", msg );
         exit( YY_EXIT_FAILURE );
         }
 
@@ -2241,7 +1981,6 @@ int main()
         return 0;
         }
 #endif
-#line 363 "scan.l"
 
 
 
