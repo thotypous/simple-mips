@@ -1,0 +1,27 @@
+    .section .text.irqhandler
+    .align 2
+    .globl __irqhandler
+    .ent __irqhandler
+__irqhandler:
+    .set noreorder
+    subu $sp,$sp,0x1c
+    sw $a0,0x00($sp)
+    syscall 0x5
+    sw $ra,0x04($sp)
+    sw $a1,0x08($sp)
+    sw $a2,0x0c($sp)
+    sw $a3,0x10($sp)
+    sw $v0,0x14($sp)
+    jal irqhandler
+    sw $v1,0x18($sp)
+    lw $a0,0x00($sp)
+    lw $ra,0x04($sp)
+    lw $a1,0x08($sp)
+    lw $a2,0x0c($sp)
+    lw $a3,0x10($sp)
+    lw $v0,0x14($sp)
+    lw $v1,0x18($sp)
+    syscall 0x6
+    addu $sp,$sp,0x1c
+    .end __irqhandler
+    .size __irqhandler,.-__irqhandler
