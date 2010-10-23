@@ -7,6 +7,7 @@ LDFLAGS=-T ldscript.x
 OBJECTS=asm/irqhandler.o asm/start.o \
         drivers/keyboard.o drivers/lcd.o drivers/led.o \
         libc/assert.o libc/ctype.o libc/exit.o libc/signal.o \
+        libc/string.o \
         main.o
 
 all: bcsd.bin
