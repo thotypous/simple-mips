@@ -159,7 +159,7 @@ module mkProcessor#(module#(AvalonMaster#(24,32)) mkMaster,
             tagged SLT   .s: execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),rf.rd2(s.rt))))    });
             tagged SLTI  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(signedLT(rf.rd1(s.rs),signExtend(s.im))))});
             tagged SLTIU .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<signExtend(s.im)) )});
-            tagged SLTU  .s: execToWB.enq(WbREG{r:s.rt, data:zeroExtend(pack(         rf.rd1(s.rs)<rf.rd2(s.rt)))     });
+            tagged SLTU  .s: execToWB.enq(WbREG{r:s.rd, data:zeroExtend(pack(         rf.rd1(s.rs)<rf.rd2(s.rt)))     });
             tagged DIV   .s:
                 action
                     dividerPending <= True;
