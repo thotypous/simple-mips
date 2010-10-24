@@ -15,8 +15,9 @@
 
 #include <libc.h>
 
+const static char * const heap_begin = (const char *)0x1000000;
+const static char * const heap_end   = (const char *)0x2000000;
 static char *heap_ptr = (char *)0x1000000;
-static char *heap_end = (char *)0x2000000;
 
 void *sbrk(int nbytes) {
     char *base;
@@ -24,7 +25,7 @@ void *sbrk(int nbytes) {
     base = heap_ptr;
     heap_ptr += nbytes;
     
-    if(heap_ptr > heap_end) {
+    if((heap_ptr >= heap_end) || (heap_ptr < heap_begin)) {
         heap_ptr -= nbytes;
         errno = ENOMEM;
         return ((void *)-1);
