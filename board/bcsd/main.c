@@ -19,9 +19,12 @@ int main() {
     keyb_init();
     asm("syscall 0x4"); /* IRQ enable */
 
+    printf("ptr:%p\n", malloc(0x100));
+
     while(1) {
         char *line = console_readline();
         console_write(line);
     }
+
     return 0;
 }
