@@ -109,7 +109,8 @@ static int voprintf(Op *op, const char *format, va_list ap) {
                 format++;
             }
             else if(c == 'p' || c == 'x' || c == 'X') {
-                unsigned int arg, tmp, shf = 0;
+                unsigned int arg, tmp;
+                int shf = 0;
                 int A = (c == 'X') ? 'A' : 'a';
                 if(c == 'p') {
                     arg = (unsigned int)va_arg(ap, void*);
@@ -121,10 +122,12 @@ static int voprintf(Op *op, const char *format, va_list ap) {
                 tmp = arg;
                 if(tmp == 0)
                     fmtn--;
-                while(tmp > 0) {
+                while(1) {
                     tmp >>= 4;
-                    shf  += 4;
                     fmtn--;
+                    if(tmp == 0)
+                        break;
+                    shf += 4;
                 }
                 while(fmtn-- > 0)
                     writechar(fill);
@@ -132,14 +135,15 @@ static int voprintf(Op *op, const char *format, va_list ap) {
                     writechar('0');
                     writechar('x');
                 }
-                while(shf > 0) {
-                    int dig = (arg >> (shf -= 4)) & 0xf;
+                while(shf >= 0) {
+                    int dig = (arg >> shf) & 0xf;
                     if(dig < 10) {
                         writechar('0'+dig);
                     }
                     else {
                         writechar(A+dig-10);
                     }
+                    shf -= 4;
                 }
                 state = OUTSIDE_FMT;
                 format++;
