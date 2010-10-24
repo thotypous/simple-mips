@@ -40,8 +40,11 @@ int strcmp(const char *s1, const char *s2);
 int putchar(int c);
 int getchar(void);
 
-int printf(const char *format, ...);
 int vprintf(const char *format, va_list ap);
+int printf(const char *format, ...);
+int vsnprintf(char *str, size_t size, const char *format, va_list ap);
+int snprintf(char *str, size_t size, const char *format, ...);
+int vsprintf(char *str, const char *format, va_list ap);
 int sprintf(char *str, const char *format, ...);
 
 extern const char *__ctype_ptr__;
