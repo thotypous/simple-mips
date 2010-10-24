@@ -8,23 +8,22 @@ void irqhandler(unsigned int mask) {
 }
 
 void keyb_callback(int ascii, int code, int isextended) {
-    if(ascii == 'c' && (keyb_modifiers & KEYB_CTRL))
+    if(ascii == 'c' && (keyb_modifiers & KEYB_CTRL)) {
         emulate_sigint();
-    else
+    }
+    else {
         console_keyb(ascii, code, isextended);
+    }
 }
 
+void bc_main();
 int main() {
     lcd_init();
     keyb_init();
     asm("syscall 0x4"); /* IRQ enable */
 
-    printf("ptr:%p\n", malloc(0x100));
+    bc_main();
 
-    while(1) {
-        char *line = console_readline();
-        console_write(line);
-    }
-
+    exit(0);
     return 0;
 }

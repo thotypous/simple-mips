@@ -236,4 +236,7 @@ int sprintf(char *str, const char *format, ...) {
     return ret;
 }
 
+int puts(const char *s) {
+    return printf("%s\n", s);
+}
 

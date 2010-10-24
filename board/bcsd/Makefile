@@ -9,8 +9,9 @@ OBJECTS=asm/irqhandler.o asm/start.o \
         drivers/keyboard.o drivers/console.o drivers/led.o \
         libc/assert.o libc/ctype.o libc/exit.o libc/signal.o \
         libc/string.o libc/errno.o libc/malloc.o libc/sbrk.o \
-        libc/chario.o libc/printf.o \
-        main.o
+        libc/chario.o libc/printf.o bc/bc.o bc/execute.o \
+        bc/global.o bc/load.o bc/main.o bc/number.o bc/scan.o \
+        bc/storage.o bc/util.o main.o
 
 all: bcsd.bin
 

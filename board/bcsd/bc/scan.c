@@ -9,6 +9,7 @@
 #define YY_FLEX_MINOR_VERSION 5
 
 #include <libc.h>
+#include <drivers/console.h>
 
 #define EOF -1
 
@@ -19,9 +20,9 @@
 #endif
 #endif
 
+#define YY_NO_UNPUT
 
 #ifdef __cplusplus
-
 
 /* Use prototypes in function declarations. */
 #define YY_USE_PROTOS
@@ -631,17 +632,52 @@ char *yytext;
 #undef yywrap
 _PROTOTYPE(int yywrap, (void));
 
-#if !defined(READLINE) && !defined(LIBEDIT)
+/* Support for the readline and history libraries.  This allows
+   nicer input on the interactive part of input. */
 
-/* MINIX returns from read with < 0 if SIGINT is  encountered.
-   In flex, we can redefine YY_INPUT to the following.  In lex, this
-   does nothing! */
+/* Have input call the following function. */
 #undef  YY_INPUT
 #define YY_INPUT(buf,result,max_size) \
-        while ( (result = read( fileno(yyin), (char *) buf, max_size )) < 0 ) \
-            if (errno != EINTR) \
-                YY_FATAL_ERROR( "read() in flex scanner failed" );
-#endif
+                rl_input((char *)buf, &result, max_size)
+
+/* Variables to help interface readline with bc. */
+static char *rl_line = (char *)NULL;
+static char *rl_start = (char *)NULL;
+static int   rl_len = 0;
+
+/* rl_input puts upto MAX characters into BUF with the number put in
+   BUF placed in *RESULT.  If the yy input file is the same as
+   rl_instream (stdin), use readline.  Otherwise, just read it.
+*/
+
+static void
+rl_input (buf, result, max)
+        char *buf;
+        int  *result;
+        int   max;
+{
+  /* Do we need a new string? */
+  if (rl_len == 0)
+    {
+      rl_start = console_readline();
+      rl_line = rl_start;
+      rl_len = strlen (rl_line)+1;
+    }
+
+  if (rl_len <= max)
+    {
+      strncpy (buf, rl_line, rl_len);
+      *result = rl_len;
+      rl_len = 0;
+    }
+  else
+    {
+      strncpy (buf, rl_line, max);
+      *result = max;
+      rl_line += max;
+      rl_len -= max;
+    }
+}
 
 #define slcomment 1
 
@@ -721,10 +757,9 @@ YY_MALLOC_DECL
 /* Copy whatever the last rule matched to the standard output. */
 
 #ifndef ECHO
-/* This used to be an fputs(), but since the string might contain NUL's,
- * we now use fwrite().
+/* yyleng would contain the number of chars
  */
-#define ECHO (void) fwrite( yytext, yyleng, 1, yyout )
+#define ECHO (void) console_write( yytext )
 #endif
 
 /* No semi-colon after return; correct usage is to write "yyterminate();" -
@@ -1062,7 +1097,7 @@ YY_RULE_SETUP
 case 41:
 YY_RULE_SETUP
 {
-              unsigned char *look;
+              char *look;
               int count = 0;
               yylval.s_value = strcopyof(yytext);
               for (look = yytext; *look != 0; look++)
@@ -1077,7 +1112,7 @@ YY_RULE_SETUP
 case 42:
 YY_RULE_SETUP
 {
-              unsigned char *src, *dst;
+              char *src, *dst;
               int len;
               /* remove a trailing decimal point. */
               len = strlen(yytext);
@@ -1454,7 +1489,6 @@ yy_state_type yy_current_state;
 
         return yy_is_jam ? 0 : yy_current_state;
         }
-
 
 #ifndef YY_NO_UNPUT
 #ifdef YY_USE_PROTOS
