@@ -660,6 +660,7 @@ rl_input (buf, result, max)
   if (rl_len == 0)
     {
       rl_start = console_readline();
+      console_write(rl_start);
       rl_line = rl_start;
       rl_len = strlen (rl_line);
     }
