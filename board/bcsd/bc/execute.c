@@ -43,8 +43,9 @@ stop_execution (sig)
      int sig;
 {
   had_sigint = TRUE;
-  printf ("\n");
-  rt_error ("interrupted execution");
+  runtime_error = TRUE;
+  /*printf ("\n");*/
+  /*rt_error ("interrupted execution");*/
 }
 
 
