@@ -36,7 +36,7 @@
 
 /* The SIGINT interrupt handling routine. */
 
-int had_sigint;
+volatile int had_sigint;
 
 void
 stop_execution (sig)

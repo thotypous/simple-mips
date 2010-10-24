@@ -74,11 +74,10 @@ static void console_render_in_buf() {
     lcd_ddram_addr(0, lcd_cursor_pos);
 }
 
-static void console_render_out_circbuf() {
+static void console_render_out_circbuf(int j) {
     const int i = console_out_circbuf_disp;
-    int j;
-    lcd_ddram_addr(1, 0);
-    for(j = 0; j < 16 && console_out_circbuf[i][j]; j++)
+    lcd_ddram_addr(1, j);
+    for(; j < 16 && console_out_circbuf[i][j]; j++)
         lcd_write_data(console_out_circbuf[i][j]);
     for(; j < 16; j++)
         lcd_write_data(' ');
@@ -144,6 +143,7 @@ static void console_delete_char(int pos) {
 void console_write(char *text) {
     int x = console_out_circbuf_char;
     int y = console_out_circbuf_pos;
+    int render_start = 0;
     while(*text) {
         if((x > 15) || (*text == '\n')) {
             y = (y + 1) & 0xff;
@@ -156,9 +156,14 @@ void console_write(char *text) {
         text++;
     }
     console_out_circbuf_char = x;
-    console_out_circbuf_pos  = y;
-    console_out_circbuf_disp = (x == 0) ? (y-1) : y;
-    console_render_out_circbuf();
+    if(y == console_out_circbuf_pos) {
+        render_start = x;
+    }
+    else {
+        console_out_circbuf_pos = y;
+        console_out_circbuf_disp = (x == 0) ? (y-1) : y;
+    }
+    console_render_out_circbuf(render_start);
 }
 
 void console_keyb(int ascii, int code, int isextended) {
@@ -178,18 +183,16 @@ void console_keyb(int ascii, int code, int isextended) {
         /* up arrow */
         console_out_circbuf_disp--;
         console_out_circbuf_disp &= 0x1ff;
-        console_render_out_circbuf();
+        console_render_out_circbuf(0);
     }
     else if( isextended && code == 0x72) {
         /* down arrow */
-        if(keyb_modifiers & KEYB_CTRL) {
-            console_out_circbuf_disp = console_out_circbuf_pos;
-        }
-        else {
+        if(keyb_modifiers & KEYB_CTRL)
+            console_out_circbuf_disp = console_out_circbuf_pos - 1;
+        else
             console_out_circbuf_disp++;
-            console_out_circbuf_disp &= 0x1ff;
-        }
-        console_render_out_circbuf();
+        console_out_circbuf_disp &= 0x1ff;
+        console_render_out_circbuf(0);
     }
     else if(!isextended && code == 0x66) {
         /* backspace */
