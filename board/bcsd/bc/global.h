@@ -122,7 +122,7 @@ HistEvent histev;
 EXTERN char c_code;
 
 /* Records the number of the runtime error. */
-EXTERN char runtime_error;
+EXTERN volatile int runtime_error;
 
 /* Holds the current location of execution. */
 EXTERN program_counter pc;
